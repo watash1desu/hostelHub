@@ -9,43 +9,43 @@ import { generateAccessToken, generateRefreshToken, verifyRefreshToken, refreshA
 
 // ADMIN REGISTRATION
 export const registerAdmin = async (req: Request, res: Response): Promise<void> => {
+  const { hostelName, adminName, adminEmail, adminPassword, mealPlan } = req.body;
+
+  if (!hostelName?.trim() || !adminName?.trim() || !adminEmail?.trim() || !adminPassword?.trim()) {
+    res.status(400).json({ message: 'All fields are required' });
+    return;
+  }
+
+  if (adminPassword.length < 8) {
+    res.status(400).json({ message: 'Password must be at least 8 characters long' });
+    return;
+  }
+
+  const domain = hostelName
+    .toLowerCase()
+    .replace(/\s+/g, '')
+    .substring(0, 10);
+
+  const generatedUsername = `admin@${domain}`;
+
+  const existingHostel = await Hostel.findOne({
+    $or: [{ name: hostelName }, { domain }]
+  });
+
+  if (existingHostel) {
+    if (existingHostel.name.toLowerCase() === hostelName.toLowerCase()) {
+      res.status(400).json({ message: 'This hostel name is already registered. Please choose a different name.' });
+    } else {
+      res.status(400).json({ 
+        message: `The domain (${domain}) is already in use by another facility. Please choose a distinct domain.` 
+      });
+    }
+    return;
+  }
+
   const session = await mongoose.startSession();
   try {
     session.startTransaction();
-
-    const { hostelName, adminName, adminEmail, adminPassword, mealPlan } = req.body;
-
-    if (!hostelName?.trim() || !adminName?.trim() || !adminEmail?.trim() || !adminPassword?.trim()) {
-      res.status(400).json({ message: 'All fields are required' });
-      return;
-    }
-
-    if (adminPassword.length < 8) {
-      res.status(400).json({ message: 'Password must be at least 8 characters long' });
-      return;
-    }
-
-    const domain = hostelName
-      .toLowerCase()
-      .replace(/\s+/g, '')
-      .substring(0, 10);
-
-    const generatedUsername = `admin@${domain}`;
-
-    const existingHostel = await Hostel.findOne({
-      $or: [{ name: hostelName }, { domain }]
-    });
-
-    if (existingHostel) {
-      if (existingHostel.name.toLowerCase() === hostelName.toLowerCase()) {
-        res.status(400).json({ message: 'This hostel name is already registered. Please choose a different name.' });
-      } else {
-        res.status(400).json({ 
-          message: `The domain (${domain}) is already in use by another facility. Please choose a distinct domain.` 
-        });
-      }
-      return;
-    }
 
     const finalMealPlan = mealPlan || [
       { mealName: 'Breakfast', offDays: [], categories: [{ categoryName: 'Main Course' }, { categoryName: 'Beverage' }, { categoryName: 'Bread' }, { categoryName: 'Condiment' }] },
