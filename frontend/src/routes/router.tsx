@@ -27,6 +27,7 @@ const AdminRegister = lazy(() => import('../pages/admin/AdminRegister'))
 const AdminDashboard = lazy(() => import('../pages/admin/AdminDashboard'))
 const AdminUsers = lazy(() => import('../pages/admin/AdminUsers'))
 const AdminMessMenu = lazy(() => import('../pages/admin/AdminMessMenu'))
+const AdminMenuRules = lazy(() => import('../pages/admin/AdminMenuRules'))
 const AdminIssues = lazy(() => import('../pages/admin/AdminIssues'))
 const AdminDishes = lazy(() => import('../pages/admin/AdminDishes'))
 const AdminSettings = lazy(() => import('../pages/admin/AdminSettings'))
@@ -105,8 +106,9 @@ export default function AppRoutes() {
             <Route path="dashboard" element={<AdminDashboard />} /> 
             <Route path="users" element={<AdminPermissionRoute primaryOnly><AdminUsers /></AdminPermissionRoute>} />
             <Route path="menu" element={<AdminPermissionRoute permission="MANAGE_MENU"><AdminMessMenu /></AdminPermissionRoute>} />
-            <Route path="issues" element={<AdminPermissionRoute permission="MANAGE_ISSUES"><AdminIssues /></AdminPermissionRoute>} />
+            <Route path="rules" element={<AdminPermissionRoute permission="MANAGE_MENU"><AdminMenuRules /></AdminPermissionRoute>} />
             <Route path="dishes" element={<AdminPermissionRoute permission="MANAGE_MENU"><AdminDishes /></AdminPermissionRoute>} />
+            <Route path="issues" element={<AdminPermissionRoute permission="MANAGE_ISSUES"><AdminIssues /></AdminPermissionRoute>} />
             <Route path="settings" element={<AdminPermissionRoute primaryOnly><AdminSettings /></AdminPermissionRoute>} />
             <Route index element={<Navigate to="dashboard" replace />} />
           </Route>

@@ -1,15 +1,31 @@
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Link, NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
-import { LogOut, User, Menu, X } from 'lucide-react'
+import { LogOut, User, Menu, X, Sparkles } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ThemeToggle } from './ThemeToggle'
 import ProfileModal from './ProfileModal'
 
-const allAdminLinks = [
+interface AdminLink {
+  label: string
+  to: string
+  primaryOnly?: boolean
+  permission?: string
+  icon?: React.ReactNode
+  badge?: string
+}
+
+const allAdminLinks: AdminLink[] = [
   { label: 'Dashboard', to: '/admin/dashboard' },
   { label: 'Users', to: '/admin/users', primaryOnly: true },
   { label: 'Menu Management', to: '/admin/menu', permission: 'MANAGE_MENU' },
+  {
+    label: 'Menu Rules',
+    to: '/admin/rules',
+    permission: 'MANAGE_MENU',
+    icon: <Sparkles className="w-3.5 h-3.5" />,
+    badge: 'AI'
+  },
   { label: 'Dishes', to: '/admin/dishes', permission: 'MANAGE_MENU' },
   { label: 'Complaints', to: '/admin/issues', permission: 'MANAGE_ISSUES' },
   { label: 'Settings', to: '/admin/settings', primaryOnly: true }
@@ -41,7 +57,7 @@ export default function AppTopbar() {
   }
 
   // Determine which links to show based on role & permissions
-  let activeLinks: { label: string; to: string }[] = []
+  let activeLinks: AdminLink[] = []
   let homeRoute = '/'
   
   if (user?.role === 'ADMIN') {
@@ -63,14 +79,20 @@ export default function AppTopbar() {
       key={link.to}
       to={link.to}
       className={({ isActive }) =>
-        `px-2 sm:px-3 py-1.5 text-body-sm sm:text-body whitespace-nowrap  rounded transition-colors ${
+        `px-2 sm:px-3 py-1.5 text-body-sm sm:text-body whitespace-nowrap rounded transition-colors inline-flex items-center gap-1.5 ${
           isActive 
             ? 'bg-ink text-canvas' 
             : 'text-muted hover:text-ink hover:bg-surface'
         }`
       }
     >
-      {link.label}
+      {link.icon}
+      <span>{link.label}</span>
+      {link.badge && (
+        <span className="text-[9px] font-mono font-bold uppercase px-1 py-0.2 rounded bg-(--color-primary)/20 text-(--color-primary) leading-tight">
+          {link.badge}
+        </span>
+      )}
     </NavLink>
   ))
 
@@ -150,14 +172,20 @@ export default function AppTopbar() {
               to={link.to}
               onClick={() => setIsMobileMenuOpen(false)}
               className={({ isActive }) =>
-                `px-4 py-3 text-body  rounded transition-colors ${
+                `px-4 py-3 text-body rounded transition-colors flex items-center gap-2 ${
                   isActive 
                     ? 'bg-ink text-canvas' 
                     : 'text-muted hover:text-ink hover:bg-surface-soft'
                 }`
               }
             >
-              {link.label}
+              {link.icon}
+              <span>{link.label}</span>
+              {link.badge && (
+                <span className="text-[9px] font-mono font-bold uppercase px-1 py-0.2 rounded bg-(--color-primary)/20 text-(--color-primary) leading-tight ml-auto">
+                  {link.badge}
+                </span>
+              )}
             </NavLink>
           ))}
         </div>
