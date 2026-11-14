@@ -6,27 +6,27 @@ import { Button } from '../../components/ui/button'
 import { Modal } from '../../components/ui/modal'
 import { Input } from '../../components/ui/input'
 import { Select } from '../../components/ui/select'
-import { Textarea } from '../../components/ui/textarea'
 import toast from 'react-hot-toast'
-import { Trash2, Plus, Ban, CheckCircle, Sparkles } from 'lucide-react'
+import { Trash2, Plus, Ban, CheckCircle } from 'lucide-react'
 
 const DAYS_OF_WEEK = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+
+type SettingsTab = 'general' | 'meals' | 'danger'
 
 export default function AdminSettings() {
   const { request } = useApi()
   const { logout } = useAuth()
-  const [activeSection, setActiveSection] = useState<'general' | 'meals' | 'constraints' | 'danger'>('general')
+
+  const getTabFromHash = (): SettingsTab => {
+    const hash = window.location.hash.replace('#', '')
+    if (hash === 'meals' || hash === 'danger') return hash
+    return 'general'
+  }
+
+  const [activeSection, setActiveSection] = useState<SettingsTab>(getTabFromHash)
   const [settings, setSettings] = useState<any>(null)
   const [initialSettings, setInitialSettings] = useState<any>(null)
   const [saving, setSaving] = useState(false)
-  
-  // Constraints state
-  const [constraintsText, setConstraintsText] = useState('')
-  const [previewedText, setPreviewedText] = useState('')
-  const [parsedConstraints, setParsedConstraints] = useState<any[]>([])
-  const [previewText, setPreviewText] = useState('')
-  const [previewErrors, setPreviewErrors] = useState<string[]>([])
-  const [previewing, setPreviewing] = useState(false)
 
   const [deleteModal, setDeleteModal] = useState<{ isOpen: boolean, type: 'mealCat', mealIndex?: number, catIndex: number, replacementCatIndex?: number } | null>(null)
   const [categoryReassignments, setCategoryReassignments] = useState<any[]>([])
@@ -35,8 +35,6 @@ export default function AdminSettings() {
     request('/admin/settings').then(res => {
       setSettings(res)
       setInitialSettings(JSON.parse(JSON.stringify(res)))
-      setConstraintsText(res.menuConstraintsText || '')
-      setPreviewedText(res.menuConstraintsText || '')
     }).catch(err => {
       toast.error(err.message || 'Failed to fetch settings')
     })
@@ -44,25 +42,18 @@ export default function AdminSettings() {
 
   useEffect(() => {
     fetchSettings()
+
+    const onHashChange = () => {
+      setActiveSection(getTabFromHash())
+    }
+    window.addEventListener('hashchange', onHashChange)
+    return () => window.removeEventListener('hashchange', onHashChange)
   }, [])
 
-  useEffect(() => {
-    const observer = new IntersectionObserver((entries) => {
-      entries.forEach(entry => {
-        if (entry.isIntersecting) {
-          setActiveSection(entry.target.id as any)
-        }
-      })
-    }, { rootMargin: '-20% 0px -60% 0px', threshold: 0 })
-
-    const sections = ['general', 'meals', 'constraints']
-    sections.forEach(id => {
-      const el = document.getElementById(id)
-      if (el) observer.observe(el)
-    })
-
-    return () => observer.disconnect()
-  }, [settings])
+  const handleTabClick = (tab: SettingsTab) => {
+    setActiveSection(tab)
+    window.location.hash = tab
+  }
 
   const saveSettings = async () => {
     if (!settings.defaultPassword || !settings.defaultPassword.trim()) {
@@ -72,30 +63,13 @@ export default function AdminSettings() {
 
     try {
       setSaving(true)
-      
-      // Save general settings
       await request('/admin/settings', 'PUT', { ...settings, categoryReassignments })
-      
-      // Save constraints if changed and previewed
-      if (constraintsText !== initialSettings.menuConstraintsText) {
-        await request('/admin/settings/menu-constraints/confirm', 'POST', {
-          text: constraintsText,
-          constraints: parsedConstraints
-        })
-      }
-
       toast.success('Settings saved successfully')
       
-      const newSettings = { 
-        ...settings, 
-        menuConstraintsText: constraintsText,
-        ...(constraintsText !== initialSettings.menuConstraintsText ? { menuConstraints: parsedConstraints } : {})
-      }
+      const newSettings = { ...settings }
       setSettings(newSettings)
       setInitialSettings(JSON.parse(JSON.stringify(newSettings)))
       setCategoryReassignments([])
-      setPreviewedText(constraintsText)
-      setPreviewText('')
     } catch (err: any) {
       toast.error(err.message || 'Failed to save settings')
     } finally {
@@ -103,37 +77,7 @@ export default function AdminSettings() {
     }
   }
 
-  const handlePreviewConstraints = async () => {
-    if (!constraintsText.trim()) {
-      setParsedConstraints([])
-      setPreviewText('No constraints defined.')
-      setPreviewErrors([])
-      setPreviewedText(constraintsText)
-      return
-    }
-
-    try {
-      setPreviewing(true)
-      setPreviewErrors([])
-      
-      const res = await request('/admin/settings/menu-constraints/preview', 'POST', { text: constraintsText }, { skipToast: true })
-      
-      setParsedConstraints(res.constraints)
-      setPreviewText(res.preview)
-      setPreviewedText(constraintsText)
-    } catch (err: any) {
-      if (err.message === 'Could not produce a consistent rule set') {
-        setPreviewErrors(['Validation failed: Check your logic for conflicting rules.'])
-      } else {
-        toast.error(err.message || 'Failed to parse constraints')
-      }
-    } finally {
-      setPreviewing(false)
-    }
-  }
-
-  const hasChanges = JSON.stringify(settings) !== JSON.stringify(initialSettings) || constraintsText !== initialSettings?.menuConstraintsText
-  const canSaveConstraints = constraintsText === previewedText && previewErrors.length === 0
+  const hasChanges = JSON.stringify(settings) !== JSON.stringify(initialSettings)
 
   const handleDeleteConfirm = () => {
     if (!deleteModal || !settings) return
@@ -225,194 +169,156 @@ export default function AdminSettings() {
     <>
     <div className="w-full mx-auto pb-24 animate-in fade-in duration-300">
       <div className="flex flex-col lg:flex-row gap-8 mt-2">
-        {/* Navigation Sidebar */}
-        <div className="lg:w-64 shrink-0 hidden lg:block">
+        {/* Navigation Tabs */}
+        <div className="lg:w-64 shrink-0">
           <div className="sticky top-24 flex flex-col gap-1 border border-hairline p-2 rounded-lg bg-canvas">
-            <a href="#general" className={`px-3 py-2 text-body rounded transition-colors ${activeSection === 'general' ? 'bg-(--color-primary)/10 text-(--color-primary) ' : 'text-ink hover:bg-surface-soft'}`}>General</a>
-            <a href="#meals" className={`px-3 py-2 text-body rounded transition-colors ${activeSection === 'meals' ? 'bg-(--color-primary)/10 text-(--color-primary) ' : 'text-ink hover:bg-surface-soft'}`}>Mess Menu Config</a>
-            <a href="#constraints" className={`px-3 py-2 text-body rounded transition-colors ${activeSection === 'constraints' ? 'bg-(--color-primary)/10 text-(--color-primary) ' : 'text-ink hover:bg-surface-soft'}`}>AI Menu Rules</a>
-            <a href="#danger" className={`px-3 py-2 text-body rounded transition-colors ${activeSection === 'danger' ? 'bg-(--color-semantic-error)/10 text-(--color-semantic-error) ' : 'text-(--color-semantic-error) hover:bg-surface-soft'}`}>Danger Zone</a>
+            <button
+              type="button"
+              onClick={() => handleTabClick('general')}
+              className={`text-left px-3 py-2 text-body rounded transition-colors ${activeSection === 'general' ? 'bg-(--color-primary)/10 text-(--color-primary) font-medium' : 'text-ink hover:bg-surface-soft'}`}
+            >
+              General
+            </button>
+            <button
+              type="button"
+              onClick={() => handleTabClick('meals')}
+              className={`text-left px-3 py-2 text-body rounded transition-colors ${activeSection === 'meals' ? 'bg-(--color-primary)/10 text-(--color-primary) font-medium' : 'text-ink hover:bg-surface-soft'}`}
+            >
+              Mess Menu Config
+            </button>
+            <button
+              type="button"
+              onClick={() => handleTabClick('danger')}
+              className={`text-left px-3 py-2 text-body rounded transition-colors ${activeSection === 'danger' ? 'bg-(--color-semantic-error)/10 text-(--color-semantic-error) font-medium' : 'text-(--color-semantic-error) hover:bg-surface-soft'}`}
+            >
+              Danger Zone
+            </button>
           </div>
         </div>
 
-        {/* Content Area */}
+        {/* Content Area - Single Section at a Time */}
         <div className="flex-1 space-y-12">
-          {/* General Section */}
-          <section id="general" className="scroll-mt-24 space-y-6">
-          <Card className="p-6 shadow-none border-hairline">
-            <h2 className="text-card-title text-ink mb-1">Default User Password</h2>
-            <div className="w-full">
-              <p className="text-body-xs text-muted mb-4">
-                This password will be assigned to all new users created individually or in bulk if no password is provided. If left empty, a random password will be generated for each user.
-              </p>
-              <div className="max-w-md">
-                <Input
-                  type="text"
-                  value={settings.defaultPassword || ''}
-                  onChange={(e: any) => setSettings({ ...settings, defaultPassword: e.target.value })}
-                  placeholder="Enter default password"
-                />
-              </div>
-            </div>
-          </Card>
-          </section>
-
-          {/* Meals Section */}
-          <section id="meals" className="scroll-mt-24">
-            <h2 className="text-card-title text-ink mb-4 pb-2 border-b border-hairline">Mess Menu Configuration</h2>
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 items-start">
-          {settings.mealPlan.map((meal: any, mIdx: number) => (
-            <Card key={meal.mealName} className={`p-5 shadow-none border-hairline transition-opacity ${meal.isActive === false ? 'opacity-70 bg-surface-soft' : ''}`}>
-              <div className="flex justify-between items-start mb-4 border-b border-hairline pb-4">
-                <div>
-                  <h2 className={`text-card-title ${meal.isActive !== false ? 'text-ink' : 'text-muted line-through'}`}>{meal.mealName}</h2>
-                  {meal.isActive === false && <p className="text-caption text-(--color-semantic-error) mt-1">MEAL DEACTIVATED</p>}
+          {activeSection === 'general' && (
+            <section id="general" className="space-y-6">
+              <Card className="p-6 shadow-none border-hairline">
+                <h2 className="text-card-title text-ink mb-1">Default User Password</h2>
+                <div className="w-full">
+                  <p className="text-body-xs text-muted mb-4">
+                    This password will be assigned to all new users created individually or in bulk if no password is provided. If left empty, a random password will be generated for each user.
+                  </p>
+                  <div className="max-w-md">
+                    <Input
+                      type="text"
+                      value={settings.defaultPassword || ''}
+                      onChange={(e: any) => setSettings({ ...settings, defaultPassword: e.target.value })}
+                      placeholder="Enter default password"
+                    />
+                  </div>
                 </div>
-                <button 
-                  onClick={() => toggleMealActive(mIdx)}
-                  className={`p-2 rounded transition-colors ${meal.isActive !== false ? 'text-(--color-semantic-warning) hover:bg-canvas' : 'text-(--color-semantic-success) hover:bg-surface-hover bg-canvas border border-hairline'}`}
-                  title={meal.isActive !== false ? "Deactivate Meal" : "Activate Meal"}
-                >
-                  {meal.isActive !== false ? <Ban size={20} /> : <CheckCircle size={20} />}
-                </button>
-              </div>
-              
-              <div className={`transition-all ${meal.isActive === false ? 'pointer-events-none opacity-50' : ''}`}>
-                <div className="mb-6">
-                  <h3 className="text-body text-muted mb-2">Off-Days (No meal served)</h3>
-                <div className="flex flex-wrap gap-2">
-                  {DAYS_OF_WEEK.map((day, dIdx) => {
-                    const isOff = meal.offDays.includes(dIdx)
-                    return (
-                      <button
-                        key={day}
-                        onClick={() => toggleOffDay(mIdx, dIdx)}
-                        className={`px-3 py-1 text-body-sm rounded-full border transition-colors ${
-                          isOff 
-                            ? 'bg-(--color-semantic-error) text-white border-transparent' 
-                            : 'bg-surface-soft text-muted border-hairline hover:bg-surface-hover hover:text-ink'
-                        }`}
+              </Card>
+            </section>
+          )}
+
+          {activeSection === 'meals' && (
+            <section id="meals">
+              <h2 className="text-card-title text-ink mb-4 pb-2 border-b border-hairline">Mess Menu Configuration</h2>
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 items-start">
+                {settings.mealPlan.map((meal: any, mIdx: number) => (
+                  <Card key={meal.mealName} className={`p-5 shadow-none border-hairline transition-opacity ${meal.isActive === false ? 'opacity-70 bg-surface-soft' : ''}`}>
+                    <div className="flex justify-between items-start mb-4 border-b border-hairline pb-4">
+                      <div>
+                        <h2 className={`text-card-title ${meal.isActive !== false ? 'text-ink' : 'text-muted line-through'}`}>{meal.mealName}</h2>
+                        {meal.isActive === false && <p className="text-caption text-(--color-semantic-error) mt-1">MEAL DEACTIVATED</p>}
+                      </div>
+                      <button 
+                        onClick={() => toggleMealActive(mIdx)}
+                        className={`p-2 rounded transition-colors ${meal.isActive !== false ? 'text-(--color-semantic-warning) hover:bg-canvas' : 'text-(--color-semantic-success) hover:bg-surface-hover bg-canvas border border-hairline'}`}
+                        title={meal.isActive !== false ? "Deactivate Meal" : "Activate Meal"}
                       >
-                        {day}
+                        {meal.isActive !== false ? <Ban size={20} /> : <CheckCircle size={20} />}
                       </button>
-                    )
-                  })}
-                </div>
-              </div>
+                    </div>
+                    
+                    <div className={`transition-all ${meal.isActive === false ? 'pointer-events-none opacity-50' : ''}`}>
+                      <div className="mb-6">
+                        <h3 className="text-body text-muted mb-2">Off-Days (No meal served)</h3>
+                        <div className="flex flex-wrap gap-2">
+                          {DAYS_OF_WEEK.map((day, dIdx) => {
+                            const isOff = meal.offDays.includes(dIdx)
+                            return (
+                              <button
+                                key={day}
+                                onClick={() => toggleOffDay(mIdx, dIdx)}
+                                className={`px-3 py-1 text-body-sm rounded-full border transition-colors ${
+                                  isOff 
+                                    ? 'bg-(--color-semantic-error) text-white border-transparent' 
+                                    : 'bg-surface-soft text-muted border-hairline hover:bg-surface-hover hover:text-ink'
+                                }`}
+                              >
+                                {day}
+                              </button>
+                            )
+                          })}
+                        </div>
+                      </div>
 
-              <div>
-                <div className="flex justify-between items-center mb-2">
-                  <h3 className="text-body text-muted">Categories</h3>
-                  <button onClick={() => addMealCategory(mIdx)} className="text-primary text-body-sm hover:underline flex items-center gap-1">
-                    <Plus size={14} /> Add Category
-                  </button>
-                </div>
-                <div className="space-y-2">
-                  {meal.categories.map((cat: any, cIdx: number) => (
-                    <div key={cIdx} className={`flex items-center justify-between p-2 rounded border ${cat.isActive ? 'bg-surface-soft border-hairline' : 'bg-canvas border-hairline opacity-60'}`}>
-                      <span className={`text-body ${cat.isActive ? 'text-ink' : 'text-muted line-through'}`}>{cat.categoryName}</span>
-                      <div className="flex items-center gap-2">
-                        <button 
-                          onClick={() => toggleMealCategoryActive(mIdx, cIdx)}
-                          className={`p-1.5 rounded transition-colors ${cat.isActive ? 'text-(--color-semantic-warning) hover:bg-canvas' : 'text-(--color-semantic-success) hover:bg-surface-hover'}`}
-                          title={cat.isActive ? "Deactivate" : "Activate"}
-                        >
-                          {cat.isActive ? <Ban size={16} /> : <CheckCircle size={16} />}
-                        </button>
-                        <button 
-                          onClick={() => setDeleteModal({ isOpen: true, type: 'mealCat', mealIndex: mIdx, catIndex: cIdx })}
-                          className="p-1.5 text-muted hover:text-(--color-semantic-error) hover:bg-canvas rounded transition-colors"
-                          title="Delete Permanently"
-                        >
-                          <Trash2 size={16} />
-                        </button>
+                      <div>
+                        <div className="flex justify-between items-center mb-2">
+                          <h3 className="text-body text-muted">Categories</h3>
+                          <button onClick={() => addMealCategory(mIdx)} className="text-primary text-body-sm hover:underline flex items-center gap-1">
+                            <Plus size={14} /> Add Category
+                          </button>
+                        </div>
+                        <div className="space-y-2">
+                          {meal.categories.map((cat: any, cIdx: number) => (
+                            <div key={cIdx} className={`flex items-center justify-between p-2 rounded border ${cat.isActive ? 'bg-surface-soft border-hairline' : 'bg-canvas border-hairline opacity-60'}`}>
+                              <span className={`text-body ${cat.isActive ? 'text-ink' : 'text-muted line-through'}`}>{cat.categoryName}</span>
+                              <div className="flex items-center gap-2">
+                                <button 
+                                  onClick={() => toggleMealCategoryActive(mIdx, cIdx)}
+                                  className={`p-1.5 rounded transition-colors ${cat.isActive ? 'text-(--color-semantic-warning) hover:bg-canvas' : 'text-(--color-semantic-success) hover:bg-surface-hover'}`}
+                                  title={cat.isActive ? "Deactivate" : "Activate"}
+                                >
+                                  {cat.isActive ? <Ban size={16} /> : <CheckCircle size={16} />}
+                                </button>
+                                <button 
+                                  onClick={() => setDeleteModal({ isOpen: true, type: 'mealCat', mealIndex: mIdx, catIndex: cIdx })}
+                                  className="p-1.5 text-muted hover:text-(--color-semantic-error) hover:bg-canvas rounded transition-colors"
+                                  title="Delete Permanently"
+                                >
+                                  <Trash2 size={16} />
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                          {meal.categories.length === 0 && <p className="text-body-sm text-muted">No categories defined.</p>}
+                        </div>
                       </div>
                     </div>
-                  ))}
-                  {meal.categories.length === 0 && <p className="text-body-sm text-muted">No categories defined.</p>}
+                  </Card>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {activeSection === 'danger' && (
+            <section id="danger" className="space-y-6">
+              <Card className="p-6 shadow-none border-(--color-semantic-error) bg-(--color-semantic-error)/5">
+                <h2 className="text-card-title text-(--color-semantic-error) mb-4">Danger Zone</h2>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <p className="text-body-sm text-ink max-w-2xl">
+                    Permanently delete this hostel and all associated data, including users, dishes, menus, and complaints. This action cannot be undone.
+                  </p>
+                  <Button 
+                    variant="danger"
+                    onClick={() => setDeleteHostelModal(true)}
+                  >
+                    Delete Hostel
+                  </Button>
                 </div>
-              </div>
-              </div>
-            </Card>
-          ))}
-        </div>
-          </section>
-
-          {/* Constraints Section */}
-          <section id="constraints" className="scroll-mt-24">
-        <div className="space-y-6">
-          <Card className="p-6 shadow-none border-hairline">
-            <h2 className="text-card-title text-ink flex items-center gap-2">
-              <Sparkles className="w-5 h-5 text-(--color-primary)" />
-              Menu Constraints 
-            </h2>
-            <p className="text-body-sm text-muted mt-1 mb-6">
-              Write plain English rules for the menu generator. The AI will parse them into strict constraints. Examples include: "Require paneer on Monday for dinner", "Close the mess on Sunday breakfast", "Limit desserts to 2 per week".
-            </p>
-
-            <Textarea
-              value={constraintsText}
-              onChange={(e) => setConstraintsText(e.target.value)}
-              className="w-full h-40 font-mono text-body-sm"
-              placeholder="Enter your menu rules here..."
-            />
-
-            <div className="mt-4 flex justify-end">
-              <Button onClick={handlePreviewConstraints} disabled={previewing} variant="secondary">
-                {previewing ? 'Parsing...' : 'Preview Rules'}
-              </Button>
-            </div>
-
-            {previewText && (
-              <div className="mt-8 p-5 bg-surface-soft/50 border border-hairline rounded-lg">
-                <h3 className="text-body text-ink mb-2">AI Interpretation</h3>
-                <p className="text-body-sm text-muted italic">{previewText}</p>
-                
-                {previewErrors.length > 0 && (
-                  <div className="mt-4 p-3 bg-(--color-semantic-error)/10 border border-(--color-semantic-error)/20 rounded-md">
-                    <h4 className="text-caption text-(--color-semantic-error) mb-1 uppercase tracking-wider">Conflicts Detected</h4>
-                    <ul className="list-disc list-inside text-body-sm text-(--color-semantic-error)/90 space-y-1">
-                      {previewErrors.map((err, i) => <li key={i}>{err}</li>)}
-                    </ul>
-                  </div>
-                )}
-              </div>
-            )}
-            
-            {settings.menuConstraints?.length > 0 && !previewText && (
-              <div className="mt-8">
-                <h3 className="text-body text-ink mb-3">Active Rules</h3>
-                <div className="space-y-2">
-                  {settings.menuConstraints.map((c: any, i: number) => (
-                    <div key={i} className="p-3 bg-canvas border border-hairline rounded flex items-start gap-2">
-                      <div className="w-1.5 h-1.5 rounded-full bg-(--color-primary) mt-1.5 shrink-0" />
-                      <span className="text-body-sm text-ink">{c.sourcePhrase}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </Card>
-        </div>
-        </section>
-
-        {/* Danger Zone */}
-          <section id="danger" className="scroll-mt-24 space-y-6">
-            <Card className="p-6 shadow-none border-(--color-semantic-error) bg-(--color-semantic-error)/5">
-              <h2 className="text-card-title text-(--color-semantic-error) mb-4">Danger Zone</h2>
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <p className="text-body-sm text-ink max-w-2xl">
-                  Permanently delete this hostel and all associated data, including users, dishes, menus, and issues. This action cannot be undone.
-                </p>
-                <Button 
-                  variant="danger"
-                  onClick={() => setDeleteHostelModal(true)}
-                >
-                  Delete Hostel
-                </Button>
-              </div>
-            </Card>
-          </section>
+              </Card>
+            </section>
+          )}
         </div>
       </div>
 
@@ -476,21 +382,20 @@ export default function AdminSettings() {
           </div>
         </div>
       </Modal>
-
     </div>
 
-      {/* Frozen Save Bar */}
-      <div className="fixed bottom-0 left-0 right-0 p-4 bg-canvas/80 backdrop-blur-md border-t border-hairline flex justify-center z-50 pointer-events-none">
-        <div className="pointer-events-auto w-full max-w-sm">
-          <Button 
-            onClick={saveSettings} 
-            disabled={saving || !hasChanges || !canSaveConstraints}
-            className={`w-full transition-all shadow-none ${hasChanges && canSaveConstraints ? 'bg-ink text-canvas scale-105' : 'bg-surface-soft text-muted'}`}
-          >
-            {saving ? 'Saving...' : !canSaveConstraints ? 'Preview Rules First' : hasChanges ? 'Save Changes' : 'Saved'}
-          </Button>
-        </div>
+    {/* Frozen Save Bar */}
+    <div className="fixed bottom-0 left-0 right-0 p-4 bg-canvas/80 backdrop-blur-md border-t border-hairline flex justify-center z-50 pointer-events-none">
+      <div className="pointer-events-auto w-full max-w-sm">
+        <Button 
+          onClick={saveSettings} 
+          disabled={saving || !hasChanges}
+          className={`w-full transition-all shadow-none ${hasChanges ? 'bg-ink text-canvas scale-105' : 'bg-surface-soft text-muted'}`}
+        >
+          {saving ? 'Saving...' : hasChanges ? 'Save Changes' : 'Saved'}
+        </Button>
       </div>
+    </div>
     </>
   )
 }
