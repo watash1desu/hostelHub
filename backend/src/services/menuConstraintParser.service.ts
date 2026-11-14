@@ -72,15 +72,20 @@ Always fill "preview" with a plain-English restatement of every rule, so a human
 
 export async function parseMenuConstraints(
   text: string,
-  dishCatalog: { id: string; name: string; mealType: string; tags?: string[] }[]
+  dishCatalog: { id: string; name: string; mealType: string; tags?: string[] }[],
+  knownTagsWithCounts: Record<string, number> = {}
 ) {
   if (!ai) {
     ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
   }
 
+  const tagPrompt = Object.keys(knownTagsWithCounts).length > 0
+    ? `\n\nKnown tags in the library with current active dish counts:\n${JSON.stringify(knownTagsWithCounts)}\n(Prefer mapping synonyms or concepts to these known tags when applicable, e.g. mapping "sweets" to "dessert" if "dessert" is in the known tags).`
+    : '';
+
   const result = await ai.models.generateContent({
     model: 'gemini-3.6-flash',
-    contents: `${SYSTEM_PROMPT}\n\nDish catalog:\n${JSON.stringify(dishCatalog)}\n\nAdmin's rules:\n${text}`,
+    contents: `${SYSTEM_PROMPT}${tagPrompt}\n\nDish catalog:\n${JSON.stringify(dishCatalog)}\n\nAdmin's rules:\n${text}`,
     config: {
       responseMimeType: 'application/json',
       responseSchema: RULE_SCHEMA,

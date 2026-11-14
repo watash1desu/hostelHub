@@ -1,6 +1,8 @@
 import { Request, Response } from 'express';
 import { Dish } from '../models/Dish';
+import { Hostel } from '../models/Hostel';
 import { ActivityLog } from '../models/ActivityLog';
+import { normalizeTags } from '../utils/tagUtils';
 
 export const fetchDishes = async (req: Request, res: Response) => {
     const { status } = req.query;
@@ -42,6 +44,13 @@ export const approveDish = async (req: Request, res: Response) => {
     );
 
     if (!dish) return res.status(404).json({ message: 'Dish not found, already reviewed, or unauthorized' });
+
+    if (dish.tags && dish.tags.length > 0) {
+      await Hostel.updateOne(
+        { _id: hostelId },
+        { $addToSet: { tags: { $each: dish.tags } } }
+      );
+    }
 
     await ActivityLog.create({ hostelId, userId: adminId, action: `APPROVED_DISH:${dish.name}`,});
 
@@ -85,13 +94,22 @@ export const updateDish = async (req: Request, res: Response) => {
       return res.status(400).json({ message: 'priceScore and healthScore must be numbers between 1 and 5' });
     }
 
+    const normalizedTags = normalizeTags(tags);
+
     const dish = await Dish.findOneAndUpdate(
       { _id: id, hostelId },
-      { name, mealType, category, tags, priceScore, healthScore, itemClass },
+      { name, mealType, category, tags: normalizedTags, priceScore, healthScore, itemClass },
       { new: true }
     );
 
     if (!dish) return res.status(404).json({ message: 'Dish not found or unauthorized' });
+
+    if (normalizedTags.length > 0) {
+      await Hostel.updateOne(
+        { _id: hostelId },
+        { $addToSet: { tags: { $each: normalizedTags } } }
+      );
+    }
 
     await ActivityLog.create({ hostelId, userId: adminId, action: `UPDATED_DISH:${dish.name}`,});
 
@@ -119,4 +137,28 @@ export const toggleDishStatus = async (req: Request, res: Response) => {
     const dish = await Dish.findByIdAndUpdate(id, { status, rejectionReason: note || '' }, { new: true });
     if (!dish) return res.status(404).json({ message: 'Dish not found' });
     return res.status(200).json(dish);
+};
+
+export const getHostelTags = async (req: Request, res: Response) => {
+    const hostelId = req.user?.hostelId;
+    if (!hostelId) return res.status(400).json({ message: 'Hostel context is required' });
+
+    const hostel = await Hostel.findById(hostelId).select('tags');
+    const tags = hostel?.tags || [];
+
+    // Aggregate active dish counts per tag
+    const dishTagCounts: Record<string, number> = {};
+    const activeDishes = await Dish.find({ hostelId, status: 'ACTIVE' }).select('tags').lean();
+    for (const d of activeDishes) {
+      if (Array.isArray(d.tags)) {
+        for (const t of d.tags) {
+          const lower = t.trim().toLowerCase();
+          if (lower) {
+            dishTagCounts[lower] = (dishTagCounts[lower] || 0) + 1;
+          }
+        }
+      }
+    }
+
+    return res.status(200).json({ tags, dishTagCounts });
 };

@@ -7,6 +7,7 @@ import { Card } from '../../components/ui/card'
 import { Modal } from '../../components/ui/modal'
 import { Input } from '../../components/ui/input'
 import { Select } from '../../components/ui/select'
+import { TagInput } from '../../components/ui/TagInput'
 import { Pencil, Trash2, CheckCircle, XCircle, Ban } from 'lucide-react'
 
 type TabType = 'ACTIVE' | 'UNDER_REVIEW' | 'INACTIVE'
@@ -18,6 +19,7 @@ export default function AdminDishManagement() {
   const [dishStats, setDishStats] = useState<any[]>([])
   const [totalVoters, setTotalVoters] = useState(0)
   const [mealPlan, setMealPlan] = useState<any[]>([])
+  const [tagLibrary, setTagLibrary] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null)
 
@@ -39,7 +41,7 @@ export default function AdminDishManagement() {
     name: '',
     mealType: 'Lunch',
     category: 'Main Course',
-    tags: '',
+    tags: [] as string[],
     priceScore: 3,
     healthScore: 3,
     itemClass: 'ROTATING'
@@ -71,7 +73,13 @@ export default function AdminDishManagement() {
   useEffect(() => {
     const fetchSettings = async () => {
       try {
-        const data = await request('/admin/settings')
+        const [data, tagData] = await Promise.all([
+          request('/admin/settings'),
+          request('/admin/dishes/tags').catch(() => ({ tags: [] }))
+        ])
+        if (tagData?.tags) {
+          setTagLibrary(tagData.tags)
+        }
         if (data?.mealPlan) {
           setMealPlan(data.mealPlan)
           if (data.mealPlan.length > 0) {
@@ -190,7 +198,7 @@ export default function AdminDishManagement() {
       name: dish.name,
       mealType: dish.mealType,
       category: dish.category,
-      tags: dish.tags ? dish.tags.join(', ') : '',
+      tags: Array.isArray(dish.tags) ? dish.tags : [],
       priceScore: dish.priceScore || 3,
       healthScore: dish.healthScore || 3,
       itemClass: dish.itemClass || 'ROTATING'
@@ -228,7 +236,7 @@ export default function AdminDishManagement() {
     try {
       const payload = {
         ...formData,
-        tags: formData.tags ? formData.tags.split(',').map((t: string) => t.trim()) : [],
+        tags: Array.isArray(formData.tags) ? formData.tags : [],
         priceScore: Number(formData.priceScore),
         healthScore: Number(formData.healthScore)
       }
@@ -247,12 +255,16 @@ export default function AdminDishManagement() {
         name: '',
         mealType: mealPlan[0]?.mealName || 'Lunch',
         category: mealPlan[0]?.categories?.[0]?.categoryName || 'Main Course',
-        tags: '',
+        tags: [],
         priceScore: 3,
         healthScore: 3,
         itemClass: 'ROTATING'
       })
       loadDishes()
+      // Refresh tag library in case new tags were added
+      request('/admin/dishes/tags').then(res => {
+        if (res?.tags) setTagLibrary(res.tags)
+      }).catch(() => {})
     } catch (err: unknown) {
       toast.error((err as Error).message || 'Failed to save dish')
     }
@@ -356,7 +368,7 @@ export default function AdminDishManagement() {
                 name: '',
                 mealType: mealPlan[0]?.mealName || 'Lunch',
                 category: mealPlan[0]?.categories?.[0]?.categoryName || 'Main Course',
-                tags: '',
+                tags: [],
                 priceScore: 3,
                 healthScore: 3,
                 itemClass: 'ROTATING'
@@ -615,12 +627,12 @@ export default function AdminDishManagement() {
             </div>
 
             <div>
-              <label className="block text-body-sm mb-1.5">Tags <span className="text-muted text-body-xs ml-1">(Comma separated)</span></label>
-              <Input
-                type="text"
+              <label className="block text-body-sm mb-1.5">Tags</label>
+              <TagInput
                 value={formData.tags}
-                onChange={(e) => setFormData({ ...formData, tags: e.target.value })}
-                placeholder="e.g. spicy, vegan, sweet"
+                onChange={(tags) => setFormData({ ...formData, tags })}
+                suggestions={tagLibrary}
+                placeholder="Select or type tag..."
               />
             </div>
           </div>

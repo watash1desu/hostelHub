@@ -1,6 +1,8 @@
 import { Request, Response } from 'express';
 import { Dish } from '../models/Dish';
+import { Hostel } from '../models/Hostel';
 import { ActivityLog } from '../models/ActivityLog';
+import { normalizeTags } from '../utils/tagUtils';
 
 // Admin can suggest/add a dish directly
 export const createAdminDish = async (req: Request, res: Response) => {
@@ -28,12 +30,14 @@ export const createAdminDish = async (req: Request, res: Response) => {
     const validPriceScore = typeof priceScore === 'number' && priceScore >= 1 && priceScore <= 5 ? priceScore : 3;
     const validHealthScore = typeof healthScore === 'number' && healthScore >= 1 && healthScore <= 5 ? healthScore : 3;
 
+    const normalizedTags = normalizeTags(tags);
+
     const dish = await Dish.create({
       hostelId,
       name,
       mealType,
       category,
-      tags: tags || [],
+      tags: normalizedTags,
       status: 'ACTIVE', 
       itemClass: itemClass || 'ROTATING',
       priceScore: validPriceScore,
@@ -41,6 +45,13 @@ export const createAdminDish = async (req: Request, res: Response) => {
       suggestedBy: adminId,
       approvedBy: adminId
     });
+
+    if (normalizedTags.length > 0) {
+      await Hostel.updateOne(
+        { _id: hostelId },
+        { $addToSet: { tags: { $each: normalizedTags } } }
+      );
+    }
 
     await ActivityLog.create({
       hostelId,
@@ -68,15 +79,24 @@ export const suggestDish = async (req: Request, res: Response) => {
       return res.status(409).json({ message: 'Dish already exists in this hostel' });
     }
 
+    const normalizedTags = normalizeTags(tags);
+
     const dish = await Dish.create({
       hostelId,
       name,
       mealType,
       category,
-      tags: tags || [],
+      tags: normalizedTags,
       status: 'UNDER_REVIEW',
       suggestedBy: userId
     });
+
+    if (normalizedTags.length > 0) {
+      await Hostel.updateOne(
+        { _id: hostelId },
+        { $addToSet: { tags: { $each: normalizedTags } } }
+      );
+    }
 
     await ActivityLog.create({
       hostelId,

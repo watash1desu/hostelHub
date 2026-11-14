@@ -83,17 +83,30 @@ export const previewMenuConstraints = async (req: Request, res: Response) => {
       .lean();
     const catalog = dishes.map(d => ({ id: d._id.toString(), name: d.name, mealType: d.mealType, tags: d.tags }));
 
-    const { rules, preview } = await parseMenuConstraints(text, catalog);
+    // Compute dish counts per tag
+    const dishTagCounts: Record<string, number> = {};
+    for (const d of dishes) {
+      if (Array.isArray(d.tags)) {
+        for (const t of d.tags) {
+          const lower = t.trim().toLowerCase();
+          if (lower) {
+            dishTagCounts[lower] = (dishTagCounts[lower] || 0) + 1;
+          }
+        }
+      }
+    }
+
+    const { rules, preview } = await parseMenuConstraints(text, catalog, dishTagCounts);
     const validDishIds = new Set(catalog.map(d => d.id));
-    const { valid, errors } = validateConstraints(rules, validDishIds);
+    const { valid, errors, warnings } = validateConstraints(rules, validDishIds, dishTagCounts);
 
     const constraints = rules; // Map rules to constraints for backwards compatibility
 
     if (!valid) {
-      return res.status(422).json({ message: 'Could not produce a consistent rule set', errors, constraints, preview });
+      return res.status(422).json({ message: 'Could not produce a consistent rule set', errors, warnings, constraints, preview });
     }
 
-    return res.json({ constraints, preview });
+    return res.json({ constraints, preview, warnings });
 };
 
 export const confirmMenuConstraints = async (req: Request, res: Response) => {

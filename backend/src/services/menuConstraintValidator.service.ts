@@ -2,9 +2,11 @@ import jsonLogic from 'json-logic-js';
 
 export function validateConstraints(
   rules: Array<Record<string, any>>,
-  validDishIds: Set<string>
-): { valid: boolean; errors: string[] } {
+  validDishIds: Set<string>,
+  dishTagCounts: Record<string, number> = {}
+): { valid: boolean; errors: string[]; warnings: string[] } {
   const errors: string[] = [];
+  const warnings: string[] = [];
 
   const syntheticContexts = [
     { day: 0, mealType: 'Lunch', dishTags: ['paneer', 'spicy'], weekCount: { 'paneer': 0 }, daysSinceLastServed: null, isWeekend: false },
@@ -19,6 +21,14 @@ export function validateConstraints(
 
     if (r.action === 'LIMIT' && (typeof r.max !== 'number' || r.max < 0)) {
       errors.push(`Rule "${r.sourcePhrase}" is a LIMIT rule but has an invalid or missing 'max' value.`);
+    }
+
+    if (r.appliesTo?.tag) {
+      const tagLower = String(r.appliesTo.tag).trim().toLowerCase();
+      const count = dishTagCounts[tagLower] || 0;
+      if (count === 0) {
+        warnings.push(`No dishes carry '${r.appliesTo.tag}', so this rule will have no effect.`);
+      }
     }
 
     // Dry run the jsonLogic
@@ -38,5 +48,5 @@ export function validateConstraints(
     }
   }
 
-  return { valid: errors.length === 0, errors };
+  return { valid: errors.length === 0, errors, warnings };
 }

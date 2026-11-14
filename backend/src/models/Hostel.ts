@@ -1,9 +1,14 @@
 import mongoose from 'mongoose';
+import { DEFAULT_HOSTEL_TAGS } from '../utils/tagUtils';
 
 const hostelSchema = new mongoose.Schema(
   {
     name: { type: String, required: true, trim: true },
     domain: { type: String, required: true, unique: true, lowercase: true, trim: true },
+    tags: {
+      type: [String],
+      default: () => [...DEFAULT_HOSTEL_TAGS],
+    },
     mealPlan: [{
       mealName: { type: String, required: true },
       isActive: { type: Boolean, default: true },

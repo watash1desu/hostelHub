@@ -15,9 +15,12 @@ export default function AdminMenuRules() {
   const [parsedConstraints, setParsedConstraints] = useState<any[]>([])
   const [previewText, setPreviewText] = useState('')
   const [previewErrors, setPreviewErrors] = useState<string[]>([])
+  const [previewWarnings, setPreviewWarnings] = useState<string[]>([])
   const [previewing, setPreviewing] = useState(false)
   const [saving, setSaving] = useState(false)
   const [activeRules, setActiveRules] = useState<any[]>([])
+  const [tagLibrary, setTagLibrary] = useState<string[]>([])
+  const [dishTagCounts, setDishTagCounts] = useState<Record<string, number>>({})
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -27,12 +30,17 @@ export default function AdminMenuRules() {
   const fetchRules = async () => {
     try {
       setLoading(true)
-      const res = await request('/admin/settings', 'GET')
-      const text = res.menuConstraintsText || ''
+      const [settingsRes, tagsRes] = await Promise.all([
+        request('/admin/settings', 'GET'),
+        request('/admin/dishes/tags', 'GET').catch(() => ({ tags: [], dishTagCounts: {} }))
+      ])
+      const text = settingsRes.menuConstraintsText || ''
       setConstraintsText(text)
       setInitialText(text)
       setPreviewedText(text)
-      setActiveRules(res.menuConstraints || [])
+      setActiveRules(settingsRes.menuConstraints || [])
+      setTagLibrary(tagsRes.tags || [])
+      setDishTagCounts(tagsRes.dishTagCounts || {})
     } catch (err: any) {
       toast.error(err.message || 'Failed to load menu rules')
     } finally {
@@ -40,11 +48,19 @@ export default function AdminMenuRules() {
     }
   }
 
+  const handleInsertTag = (tag: string) => {
+    setConstraintsText((prev) => {
+      const trimmed = prev.trimEnd()
+      return trimmed ? `${trimmed} ${tag}` : tag
+    })
+  }
+
   const handlePreviewConstraints = async () => {
     if (!constraintsText.trim()) {
       setParsedConstraints([])
       setPreviewText('No constraints defined.')
       setPreviewErrors([])
+      setPreviewWarnings([])
       setPreviewedText(constraintsText)
       return
     }
@@ -52,6 +68,7 @@ export default function AdminMenuRules() {
     try {
       setPreviewing(true)
       setPreviewErrors([])
+      setPreviewWarnings([])
       const res = await request(
         '/admin/settings/menu-constraints/preview',
         'POST',
@@ -60,6 +77,7 @@ export default function AdminMenuRules() {
       )
       setParsedConstraints(res.constraints || [])
       setPreviewText(res.preview || '')
+      setPreviewWarnings(res.warnings || [])
       setPreviewedText(constraintsText)
     } catch (err: any) {
       if (err.message === 'Could not produce a consistent rule set') {
@@ -123,6 +141,30 @@ export default function AdminMenuRules() {
           />
         </div>
 
+        {tagLibrary.length > 0 && (
+          <div>
+            <span className="block text-caption text-muted mb-2 font-medium uppercase tracking-wider">
+              Tags in use (click to insert)
+            </span>
+            <div className="flex flex-wrap gap-1.5">
+              {tagLibrary.map((tag) => {
+                const count = dishTagCounts[tag.toLowerCase()] || 0
+                return (
+                  <button
+                    key={tag}
+                    type="button"
+                    onClick={() => handleInsertTag(tag)}
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-caption border border-hairline bg-surface hover:bg-surface-soft hover:border-muted/40 transition-colors text-ink cursor-pointer"
+                  >
+                    <span>{tag}</span>
+                    <span className="text-[10px] text-muted bg-surface-soft px-1 rounded-full">{count}</span>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
         <div className="flex justify-end gap-3 pt-2">
           <Button onClick={handlePreviewConstraints} disabled={previewing} variant="secondary">
             {previewing ? 'Parsing...' : 'Preview Rules'}
@@ -143,6 +185,17 @@ export default function AdminMenuRules() {
                 <ul className="list-disc list-inside text-body-sm text-(--color-semantic-error)/90 space-y-1">
                   {previewErrors.map((err, i) => (
                     <li key={i}>{err}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {previewWarnings.length > 0 && (
+              <div className="mt-4 p-3 bg-(--color-semantic-warning)/10 border border-(--color-semantic-warning)/25 rounded-md">
+                <h4 className="text-caption text-(--color-semantic-warning) mb-1 uppercase tracking-wider">Warnings</h4>
+                <ul className="list-disc list-inside text-body-sm text-(--color-semantic-warning)/95 space-y-1">
+                  {previewWarnings.map((warn, i) => (
+                    <li key={i}>{warn}</li>
                   ))}
                 </ul>
               </div>

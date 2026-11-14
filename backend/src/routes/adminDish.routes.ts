@@ -8,13 +8,17 @@ import {
   rejectDish,
   updateDish,
   deleteDish,
-  toggleDishStatus
+  toggleDishStatus,
+  getHostelTags
 } from '../controllers/adminDish.controller';
 import { createAdminDish } from '../controllers/dish.controller';
 
 const router = express.Router();
 
 router.use(verifyToken, requireRole('ADMIN'));
+
+// GET /api/admin/dishes/tags
+router.get('/tags', requirePermission('MANAGE_MENU'), getHostelTags);
 
 // GET /api/admin/dishes?status=ACTIVE | UNDER_REVIEW
 router.get('/', requirePermission('MANAGE_MENU'), fetchDishes);
