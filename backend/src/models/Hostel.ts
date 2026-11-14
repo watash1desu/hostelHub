@@ -13,11 +13,6 @@ const hostelSchema = new mongoose.Schema(
         isActive: { type: Boolean, default: true }
       }]
     }],
-    issueCategories: [{
-      name: { type: String, required: true, trim: true },
-      isActive: { type: Boolean, default: true }
-    }],
-    defaultResolverNote: { type: String, default: "Fixed the issue as requested." },
     defaultPassword: { type: String, default: "" },
     menuConstraintsText: { type: String, default: '' },
     menuConstraints: [{

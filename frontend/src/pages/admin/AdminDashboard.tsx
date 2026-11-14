@@ -63,10 +63,10 @@ export default function AdminDashboard() {
           <p className="text-data font-mono mt-4">{stats.activeDishes}</p>
         </div>
 
-        {/* Open Issues */}
+        {/* Open Complaints */}
         <div className="bg-canvas p-4 sm:rounded border-y sm:border-x border-hairline flex flex-col justify-between transition">
           <div className="flex justify-between items-start">
-            <h3 className="text-muted text-body-sm">Open Issues</h3>
+            <h3 className="text-muted text-body-sm">Open Complaints</h3>
           </div>
           <p className="text-data font-mono mt-4 text-semantic-error">{stats.openIssues}</p>
         </div>
@@ -130,3 +130,4 @@ export default function AdminDashboard() {
     </div>
   );
 }
+

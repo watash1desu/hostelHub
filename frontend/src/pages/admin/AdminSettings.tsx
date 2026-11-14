@@ -15,7 +15,7 @@ const DAYS_OF_WEEK = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'F
 export default function AdminSettings() {
   const { request } = useApi()
   const { logout } = useAuth()
-  const [activeSection, setActiveSection] = useState<'general' | 'meals' | 'maintenance' | 'constraints' | 'danger'>('general')
+  const [activeSection, setActiveSection] = useState<'general' | 'meals' | 'constraints' | 'danger'>('general')
   const [settings, setSettings] = useState<any>(null)
   const [initialSettings, setInitialSettings] = useState<any>(null)
   const [saving, setSaving] = useState(false)
@@ -28,7 +28,7 @@ export default function AdminSettings() {
   const [previewErrors, setPreviewErrors] = useState<string[]>([])
   const [previewing, setPreviewing] = useState(false)
 
-  const [deleteModal, setDeleteModal] = useState<{ isOpen: boolean, type: 'mealCat' | 'issueCat', mealIndex?: number, catIndex: number, replacementCatIndex?: number } | null>(null)
+  const [deleteModal, setDeleteModal] = useState<{ isOpen: boolean, type: 'mealCat', mealIndex?: number, catIndex: number, replacementCatIndex?: number } | null>(null)
   const [categoryReassignments, setCategoryReassignments] = useState<any[]>([])
 
   const fetchSettings = () => {
@@ -55,14 +55,14 @@ export default function AdminSettings() {
       })
     }, { rootMargin: '-20% 0px -60% 0px', threshold: 0 })
 
-    const sections = ['general', 'meals', 'maintenance', 'constraints']
+    const sections = ['general', 'meals', 'constraints']
     sections.forEach(id => {
       const el = document.getElementById(id)
       if (el) observer.observe(el)
     })
 
     return () => observer.disconnect()
-  }, [settings]) // Re-run observer setup when settings load and DOM is populated
+  }, [settings])
 
   const saveSettings = async () => {
     if (!settings.defaultPassword || !settings.defaultPassword.trim()) {
@@ -123,10 +123,6 @@ export default function AdminSettings() {
       setPreviewedText(constraintsText)
     } catch (err: any) {
       if (err.message === 'Could not produce a consistent rule set') {
-        // The API returns 422 with the errors array if validation fails. 
-        // Our useApi will throw an Error with the message, so we can't easily get the error array unless we modify useApi.
-        // Wait, useApi returns the parsed json on success, but throws on error.
-        // I will just show the error message. Wait, let me handle the 422 properly if I can.
         setPreviewErrors(['Validation failed: Check your logic for conflicting rules.'])
       } else {
         toast.error(err.message || 'Failed to parse constraints')
@@ -156,8 +152,6 @@ export default function AdminSettings() {
         }]);
       }
       newSettings.mealPlan[mealIndex].categories.splice(catIndex, 1)
-    } else if (type === 'issueCat') {
-      newSettings.issueCategories.splice(catIndex, 1)
     }
     
     setSettings(newSettings)
@@ -219,21 +213,6 @@ export default function AdminSettings() {
     setSettings(newSettings)
   }
 
-  const toggleIssueCategoryActive = (catIndex: number) => {
-    const newSettings = { ...settings }
-    const cat = newSettings.issueCategories[catIndex]
-    cat.isActive = !cat.isActive
-    setSettings(newSettings)
-  }
-
-  const addIssueCategory = () => {
-    const name = window.prompt("Enter new maintenance category (IT, Cleaning, etc):")
-    if (!name?.trim()) return
-    const newSettings = { ...settings }
-    newSettings.issueCategories.push({ name: name.trim(), isActive: true })
-    setSettings(newSettings)
-  }
-
   if (!settings) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -251,7 +230,6 @@ export default function AdminSettings() {
           <div className="sticky top-24 flex flex-col gap-1 border border-hairline p-2 rounded-lg bg-canvas">
             <a href="#general" className={`px-3 py-2 text-body rounded transition-colors ${activeSection === 'general' ? 'bg-(--color-primary)/10 text-(--color-primary) ' : 'text-ink hover:bg-surface-soft'}`}>General</a>
             <a href="#meals" className={`px-3 py-2 text-body rounded transition-colors ${activeSection === 'meals' ? 'bg-(--color-primary)/10 text-(--color-primary) ' : 'text-ink hover:bg-surface-soft'}`}>Mess Menu Config</a>
-            <a href="#maintenance" className={`px-3 py-2 text-body rounded transition-colors ${activeSection === 'maintenance' ? 'bg-(--color-primary)/10 text-(--color-primary) ' : 'text-ink hover:bg-surface-soft'}`}>Maintenance</a>
             <a href="#constraints" className={`px-3 py-2 text-body rounded transition-colors ${activeSection === 'constraints' ? 'bg-(--color-primary)/10 text-(--color-primary) ' : 'text-ink hover:bg-surface-soft'}`}>AI Menu Rules</a>
             <a href="#danger" className={`px-3 py-2 text-body rounded transition-colors ${activeSection === 'danger' ? 'bg-(--color-semantic-error)/10 text-(--color-semantic-error) ' : 'text-(--color-semantic-error) hover:bg-surface-soft'}`}>Danger Zone</a>
           </div>
@@ -357,67 +335,6 @@ export default function AdminSettings() {
               </div>
             </Card>
           ))}
-        </div>
-          </section>
-
-          {/* Maintenance Section */}
-          <section id="maintenance" className="scroll-mt-24 space-y-6">
-            <h2 className="text-card-title text-ink mb-2 pb-2 border-b border-hairline">Maintenance Categories</h2>
-        <div className="space-y-6">
-          <Card className="p-6 shadow-none border-hairline">
-          <div className="flex justify-between items-center mb-6">
-            <div>
-              <h2 className="text-card-title text-ink">Issue Categories</h2>
-              <p className="text-body-sm text-muted mt-1">Categories students can select when raising an issue.</p>
-            </div>
-            <Button onClick={addIssueCategory} variant="secondary" className="flex items-center gap-2">
-              <Plus size={16} /> Add Category
-            </Button>
-          </div>
-
-          <div className="space-y-3">
-            {settings.issueCategories.map((cat: any, cIdx: number) => (
-              <div key={cIdx} className={`flex items-center justify-between p-3 rounded border ${cat.isActive ? 'bg-surface-soft border-hairline' : 'bg-canvas border-hairline opacity-60'}`}>
-                <span className={`text-body ${cat.isActive ? 'text-ink' : 'text-muted line-through'}`}>{cat.name}</span>
-                <div className="flex items-center gap-3">
-                  <span className="text-body-xs text-muted uppercase">{cat.isActive ? 'Active' : 'Inactive'}</span>
-                  <button 
-                    onClick={() => toggleIssueCategoryActive(cIdx)}
-                    className={`p-1.5 rounded transition-colors ${cat.isActive ? 'text-(--color-semantic-warning) hover:bg-canvas' : 'text-(--color-semantic-success) hover:bg-surface-hover'}`}
-                    title={cat.isActive ? "Deactivate" : "Activate"}
-                  >
-                    {cat.isActive ? <Ban size={18} /> : <CheckCircle size={18} />}
-                  </button>
-                  <button 
-                    onClick={() => setDeleteModal({ isOpen: true, type: 'issueCat', catIndex: cIdx })}
-                    className="p-1.5 text-muted hover:text-(--color-semantic-error) hover:bg-canvas rounded transition-colors"
-                    title="Delete Permanently"
-                  >
-                    <Trash2 size={18} />
-                  </button>
-                </div>
-              </div>
-            ))}
-            {settings.issueCategories.length === 0 && <p className="text-body-sm text-muted">No categories defined.</p>}
-          </div>
-        </Card>
-
-        <Card className="p-6 shadow-none border-hairline">
-          <h2 className="text-card-title text-ink">General Maintenance Settings</h2>
-          <p className="text-body-sm text-muted mt-1 mb-6">Configure default behaviors for handling student issues.</p>
-          
-          <div>
-            <label className="block text-body-sm text-ink mb-2">Default Closure Remark</label>
-            <Textarea
-              value={settings.defaultResolverNote || ''}
-              onChange={(e) => setSettings({...settings, defaultResolverNote: e.target.value})}
-              className="w-full"
-              rows={3}
-              placeholder="Fixed the issue as requested."
-            />
-            <p className="text-caption text-muted mt-2 normal-case tracking-normal">This note will be pre-filled when you resolve or close an issue. You can still edit it before submitting.</p>
-          </div>
-        </Card>
         </div>
           </section>
 

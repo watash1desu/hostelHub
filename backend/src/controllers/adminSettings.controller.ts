@@ -7,25 +7,12 @@ import { validateConstraints } from '../services/menuConstraintValidator.service
 
 export const getSettings = async (req: Request, res: Response) => {
     const hostelId = req.user!.hostelId;
-    const hostel = await Hostel.findById(hostelId).select('mealPlan issueCategories menuConstraints menuConstraintsText defaultPassword');
+    const hostel = await Hostel.findById(hostelId).select('mealPlan menuConstraints menuConstraintsText defaultPassword');
     
     if (!hostel) return res.status(404).json({ message: 'Hostel not found' });
 
-    // Provide default issue categories if none exist
-    let categories = hostel.issueCategories;
-    if (!categories || categories.length === 0) {
-      categories = [
-        { name: 'Electrician', isActive: true },
-        { name: 'Plumbing', isActive: true },
-        { name: 'Carpenter', isActive: true },
-        { name: 'Cleaning', isActive: true },
-        { name: 'Other', isActive: true }
-      ] as any;
-    }
-
     return res.status(200).json({
       mealPlan: hostel.mealPlan,
-      issueCategories: categories,
       menuConstraints: hostel.menuConstraints || [],
       menuConstraintsText: hostel.menuConstraintsText || '',
       defaultPassword: hostel.defaultPassword || ''
@@ -34,7 +21,7 @@ export const getSettings = async (req: Request, res: Response) => {
 
 export const updateSettings = async (req: Request, res: Response) => {
     const hostelId = req.user!.hostelId;
-    const { mealPlan, issueCategories, defaultPassword } = req.body;
+    const { mealPlan, defaultPassword } = req.body;
 
     const hostel = await Hostel.findById(hostelId);
     if (!hostel) return res.status(404).json({ message: 'Hostel not found' });
@@ -68,7 +55,6 @@ export const updateSettings = async (req: Request, res: Response) => {
     }
 
     hostel.mealPlan = mealPlan;
-    hostel.issueCategories = issueCategories;
 
     if (defaultPassword !== undefined) {
       if (!defaultPassword.trim()) {
@@ -82,8 +68,7 @@ export const updateSettings = async (req: Request, res: Response) => {
 
     return res.status(200).json({ 
       message: 'Settings updated successfully',
-      mealPlan: hostel.mealPlan,
-      issueCategories: hostel.issueCategories
+      mealPlan: hostel.mealPlan
     });
 };
 

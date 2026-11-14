@@ -3,11 +3,11 @@ import { useApi } from '../../hooks/useApi';
 import { useAuth } from '../../hooks/useAuth';
 import toast from 'react-hot-toast';
 import { Button } from '../../components/ui/button';
-import { Select } from '../../components/ui/select';
+import { Input } from '../../components/ui/input';
 import { Textarea } from '../../components/ui/textarea';
 import { Badge } from '../../components/ui/badge';
 import { Modal } from '../../components/ui/modal';
-import { Plus, MessageSquare, AlertCircle, CheckCircle2, Clock } from 'lucide-react';
+import { Plus, AlertCircle, CheckCircle2, Clock } from 'lucide-react';
 import { formatDate } from '../../lib/utils';
 
 interface RaiseIssueFormProps {
@@ -18,42 +18,65 @@ interface RaiseIssueFormProps {
 function RaiseIssueForm({ onSuccess, onCancel }: RaiseIssueFormProps) {
   const { request } = useApi();
   const [formData, setFormData] = useState({
-    category: '',
-    priority: 'MEDIUM',
+    subject: '',
     description: ''
+  });
+  const [touched, setTouched] = useState({
+    subject: false,
+    description: false
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const [categories, setCategories] = useState<string[]>([]);
-  const priorities = ['LOW', 'MEDIUM', 'HIGH', 'URGENT'];
-
-  useEffect(() => {
-    request('/issues/categories').then((res: any) => {
-      if (res.categories) setCategories(res.categories);
-    }).catch(console.error);
-  }, []);
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
     setError('');
   };
 
+  const handleBlur = (field: 'subject' | 'description') => {
+    setTouched(prev => ({ ...prev, [field]: true }));
+  };
+
+  const isSubjectEmpty = !formData.subject.trim();
+  const isSubjectTooLong = formData.subject.trim().length > 80;
+  const isDescriptionEmpty = !formData.description.trim();
+
+  const subjectError = touched.subject && isSubjectEmpty
+    ? 'Subject is required'
+    : touched.subject && isSubjectTooLong
+    ? 'Subject must be 80 characters or less'
+    : '';
+
+  const descriptionError = touched.description && isDescriptionEmpty
+    ? 'Description is required'
+    : '';
+
+  const canSubmit = !isSubjectEmpty && !isSubjectTooLong && !isDescriptionEmpty && !loading;
+
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!formData.category || !formData.description) {
-      setError('Please fill in all required fields');
+    setTouched({ subject: true, description: true });
+
+    if (isSubjectEmpty || isSubjectTooLong || isDescriptionEmpty) {
+      setError('Please resolve field errors before submitting');
       return;
     }
+
     try {
       setLoading(true);
       setError('');
-      await request('/issues', 'POST', formData);
-      setFormData({ category: '', priority: 'MEDIUM', description: '' });
+      await request('/issues', 'POST', {
+        subject: formData.subject.trim(),
+        description: formData.description.trim()
+      });
+      toast.success('Complaint submitted successfully');
+      setFormData({ subject: '', description: '' });
       onSuccess();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to raise issue');
+      const msg = err instanceof Error ? err.message : 'Failed to raise complaint';
+      setError(msg);
+      toast.error(msg);
     } finally {
       setLoading(false);
     }
@@ -68,29 +91,60 @@ function RaiseIssueForm({ onSuccess, onCancel }: RaiseIssueFormProps) {
         </div>
       )}
       <div>
-        <label htmlFor="category" className="block text-body-sm text-muted mb-1">Issue Category *</label>
-        <Select id="category" name="category" value={formData.category} onChange={handleChange} required className="w-full">
-          <option value="">Select a category</option>
-          {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
-        </Select>
-      </div>
-      <div>
-        <label htmlFor="priority" className="block text-body-sm text-muted mb-1">Priority Level</label>
-        <Select id="priority" name="priority" value={formData.priority} onChange={handleChange} className="w-full">
-          {priorities.map(p => <option key={p} value={p}>{p}</option>)}
-        </Select>
+        <label htmlFor="subject" className="block text-body-sm text-muted mb-1">Subject *</label>
+        <Input
+          id="subject"
+          name="subject"
+          value={formData.subject}
+          onChange={handleChange}
+          onBlur={() => handleBlur('subject')}
+          placeholder="e.g. Menu change, Rotten dish, Ants on tables"
+          maxLength={80}
+          required
+          className="w-full"
+        />
+        <div className="flex justify-between items-center mt-1">
+          {subjectError ? (
+            <p className="text-body-xs text-(--color-semantic-error)">{subjectError}</p>
+          ) : (
+            <span />
+          )}
+          <span className="text-body-xs text-muted font-mono">{formData.subject.length}/80</span>
+        </div>
       </div>
       <div>
         <label htmlFor="description" className="block text-body-sm text-muted mb-1">Description *</label>
-        <Textarea id="description" name="description" value={formData.description} onChange={handleChange} placeholder="Describe your issue in detail..." rows={5} required />
+        <Textarea
+          id="description"
+          name="description"
+          value={formData.description}
+          onChange={handleChange}
+          onBlur={() => handleBlur('description')}
+          placeholder="Describe your complaint in detail..."
+          rows={5}
+          required
+          className="w-full"
+        />
+        {descriptionError && (
+          <p className="text-body-xs text-(--color-semantic-error) mt-1">{descriptionError}</p>
+        )}
       </div>
-      <div className="flex justify-end gap-3 pt-2">
-        <Button variant="secondary" type="button" onClick={onCancel} disabled={loading}>
-          Cancel
-        </Button>
-        <Button variant="primary" type="submit" disabled={loading}>
-          {loading ? 'Raising...' : 'Raise Issue'}
-        </Button>
+      <div className="flex flex-col sm:flex-row justify-between items-center gap-3 pt-2">
+        <div>
+          {!canSubmit && !loading && (
+            <span className="text-body-xs text-muted">
+              {isSubjectEmpty || isDescriptionEmpty ? 'Fill in subject and description to submit' : isSubjectTooLong ? 'Subject exceeds 80 characters' : ''}
+            </span>
+          )}
+        </div>
+        <div className="flex gap-3 w-full sm:w-auto justify-end">
+          <Button variant="secondary" type="button" onClick={onCancel} disabled={loading}>
+            Cancel
+          </Button>
+          <Button variant="primary" type="submit" disabled={!canSubmit}>
+            {loading ? 'Submitting...' : 'Submit Complaint'}
+          </Button>
+        </div>
       </div>
     </form>
   );
@@ -98,8 +152,7 @@ function RaiseIssueForm({ onSuccess, onCancel }: RaiseIssueFormProps) {
 
 interface Issue {
   _id: string;
-  category: string;
-  priority: string;
+  subject: string;
   status: string;
   description: string;
   resolverNote?: string;
@@ -117,7 +170,7 @@ export default function StudentIssuesPage() {
 
   const handleOpenModal = () => {
     if (!user?.name || !user.name.trim()) {
-      toast.error('Please update your profile with your full name before raising an issue.');
+      toast.error('Please update your profile with your full name before raising a complaint.');
       return;
     }
     setIsModalOpen(true);
@@ -133,7 +186,7 @@ export default function StudentIssuesPage() {
       const response = await request('/issues/my-issues', 'GET');
       setIssues(response.issues || []);
     } catch (error) {
-      console.error('Failed to fetch issues:', error);
+      console.error('Failed to fetch complaints:', error);
     } finally {
       setLoading(false);
     }
@@ -155,27 +208,13 @@ export default function StudentIssuesPage() {
     }
   };
 
-  const getPriorityVariant = (priority: string) => {
-    switch (priority) {
-      case 'LOW':
-        return 'success';
-      case 'MEDIUM':
-        return 'warning';
-      case 'HIGH':
-      case 'URGENT':
-        return 'error';
-      default:
-        return 'outline';
-    }
-  };
-
   return (
     <div className="w-full max-w-4xl mx-auto pb-32">
       {/* Header section */}
       <section className="mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-card-title md:text-headline tracking-tight text-ink leading-tight">My Issues</h1>
-          <p className="text-body text-muted mt-1">Track the issues you've raised and read admin responses</p>
+          <h1 className="text-card-title md:text-headline tracking-tight text-ink leading-tight">My Complaints</h1>
+          <p className="text-body text-muted mt-1">Track the complaints you've raised and read admin responses</p>
         </div>
         <Button
           variant="secondary"
@@ -183,24 +222,18 @@ export default function StudentIssuesPage() {
           className="whitespace-nowrap flex items-center gap-2 border-hairline hover:bg-surface-soft"
         >
           <Plus className="w-4 h-4" />
-          Raise New Issue
+          Raise Complaint
         </Button>
       </section>
 
-      {/* Issues List */}
+      {/* Complaints List */}
       <div className="space-y-4">
         {loading ? (
-          <div className="py-12 text-center text-muted">Loading your issues...</div>
+          <div className="py-12 text-center text-muted">Loading your complaints...</div>
         ) : issues.length === 0 ? (
-          <div className="py-16 px-4 text-center bg-canvas sm:bg-surface/30 border border-hairline rounded-xl flex flex-col items-center justify-center">
-            <div className="w-16 h-16 rounded-full bg-surface-soft flex items-center justify-center mb-4 text-muted">
-              <MessageSquare className="w-8 h-8" />
-            </div>
-            <h3 className="text-card-title text-ink mb-2">No Issues Found</h3>
-            <p className="text-body text-muted max-w-md mx-auto mb-6">You haven't reported any issues yet. If you face any problems with the mess or hostel facilities, let us know.</p>
-            <Button variant="secondary" onClick={handleOpenModal}>
-              Raise an Issue
-            </Button>
+          <div className="py-16 px-4 text-center bg-canvas sm:bg-surface/30 border border-hairline rounded-xl">
+            <h3 className="text-card-title text-ink mb-2">No Complaints Found</h3>
+            <p className="text-body text-muted max-w-md mx-auto">You haven't reported any complaints yet. If you face any problems with the mess or food facilities, let us know.</p>
           </div>
         ) : (
           issues.map((issue) => {
@@ -210,17 +243,12 @@ export default function StudentIssuesPage() {
               <div key={issue._id} className="bg-canvas sm:bg-surface/30 border border-hairline rounded-xl overflow-hidden transition-all hover:border-ink/20 flex flex-col">
                 <div className="flex items-center justify-between p-4 border-b border-hairline bg-surface-soft/40">
                   <div className="flex items-center gap-3">
-                    <h3 className={`text-body  capitalize ${isClosed ? 'text-muted line-through decoration-ink/30' : 'text-ink'}`}>
-                      {issue.category}
+                    <h3 className={`text-body font-medium ${isClosed ? 'text-muted line-through decoration-ink/30' : 'text-ink'}`}>
+                      {issue.subject}
                     </h3>
-                    <div className="flex gap-2">
-                      <Badge variant={getStatusVariant(issue.status) as any} className="text-[10px] tracking-widest px-2 py-0.5 rounded-sm uppercase">
-                        {issue.status}
-                      </Badge>
-                      <Badge variant={getPriorityVariant(issue.priority) as any} className="text-[10px] tracking-widest px-2 py-0.5 rounded-sm uppercase">
-                        {issue.priority}
-                      </Badge>
-                    </div>
+                    <Badge variant={getStatusVariant(issue.status) as any} className="text-[10px] tracking-widest px-2 py-0.5 rounded-sm uppercase">
+                      {issue.status}
+                    </Badge>
                   </div>
                   <div className="text-[11px] font-mono text-muted tracking-wide flex items-center gap-1.5">
                     <Clock className="w-3.5 h-3.5" />
@@ -251,7 +279,7 @@ export default function StudentIssuesPage() {
         )}
       </div>
 
-      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Raise New Issue">
+      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Raise a Complaint">
         <RaiseIssueForm onSuccess={handleIssueRaised} onCancel={() => setIsModalOpen(false)} />
       </Modal>
     </div>

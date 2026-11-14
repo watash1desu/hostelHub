@@ -4,7 +4,6 @@ import { useApi } from '../../hooks/useApi';
 import { Card } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/table';
-import { Badge } from '../../components/ui/badge';
 import { Select } from '../../components/ui/select';
 import { Pagination } from '../../components/ui/pagination';
 import { Modal } from '../../components/ui/modal';
@@ -15,12 +14,11 @@ import { formatDate } from '../../lib/utils';
 
 interface Issue {
   _id: string;
-  category: string;
-  priority: string;
+  subject: string;
   status: string;
   description: string;
   resolverNote?: string;
-  raisedBy: any; // Populated user object or string ID if not populated
+  raisedBy: any;
   raisedByName: string;
   roomNo: string;
   createdAt: string;
@@ -31,11 +29,8 @@ export default function AdminIssues() {
   const { request } = useApi();
   const [issues, setIssues] = useState<Issue[]>([]);
   const [loading, setLoading] = useState(true);
-  const [settings, setSettings] = useState<any>(null);
   const [closePrompt, setClosePrompt] = useState<{ issueId: string, note: string } | null>(null);
 
-  const [filterCategory, setFilterCategory] = useState<string>('ALL');
-  const [filterPriority, setFilterPriority] = useState<string>('ALL');
   const [filterStatus, setFilterStatus] = useState<string>('ACTIVE');
 
   // Pagination State
@@ -46,7 +41,6 @@ export default function AdminIssues() {
 
   useEffect(() => {
     fetchIssues();
-    request('/admin/settings', 'GET').then(res => setSettings(res)).catch(err => logger.error('APP', 'Failed to fetch settings', err));
   }, []);
 
   const fetchIssues = async () => {
@@ -54,14 +48,12 @@ export default function AdminIssues() {
       const response = await request('/issues/admin/all', 'GET');
       setIssues(response.issues || []);
     } catch (error: any) {
-      logger.error('APP', 'Failed to fetch issues:', error);
-      toast.error('Failed to load issues');
+      logger.error('APP', 'Failed to fetch complaints:', error);
+      toast.error('Failed to load complaints');
     } finally {
       setLoading(false);
     }
   };
-
-
 
   const handleStatusUpdate = async (issueId: string, newStatus: string, resolverNote?: string) => {
     try {
@@ -69,22 +61,18 @@ export default function AdminIssues() {
       if (resolverNote !== undefined) payload.resolverNote = resolverNote;
 
       await request(`/issues/${issueId}/status`, 'PATCH', payload);
-      toast.success('Issue status updated successfully');
+      toast.success('Complaint status updated successfully');
       fetchIssues();
     } catch (err: any) {
       toast.error(err.message || 'Failed to update status');
     }
   };
 
-  const categories = Array.from(new Set(issues.map(i => i.category)));
-
   const filteredIssues = issues.filter(issue => {
-    const matchCategory = filterCategory === 'ALL' || issue.category === filterCategory;
-    const matchPriority = filterPriority === 'ALL' || issue.priority === filterPriority;
     const matchStatus = filterStatus === 'ALL' ||
       (filterStatus === 'ACTIVE' && issue.status === 'OPEN') ||
       (filterStatus === 'CLOSED' && issue.status === 'CLOSED');
-    return matchCategory && matchPriority && matchStatus;
+    return matchStatus;
   });
 
   const handleSort = (key: string) => {
@@ -103,11 +91,7 @@ export default function AdminIssues() {
     let valA: any = a[key as keyof Issue];
     let valB: any = b[key as keyof Issue];
 
-    if (key === 'priority') {
-      const pMap: Record<string, number> = { URGENT: 4, HIGH: 3, MEDIUM: 2, LOW: 1 };
-      valA = pMap[a.priority] || 0;
-      valB = pMap[b.priority] || 0;
-    } else if (key === 'status') {
+    if (key === 'status') {
       const sMap: Record<string, number> = { OPEN: 1, CLOSED: 2 };
       valA = sMap[a.status] || 0;
       valB = sMap[b.status] || 0;
@@ -129,16 +113,9 @@ export default function AdminIssues() {
 
   const handleDownloadPdf = () => {
     const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
-    let url = `${baseUrl}/issues/admin/export.pdf?status=${encodeURIComponent(filterStatus)}`;
-    if (filterCategory !== 'ALL') {
-      url += `&category=${encodeURIComponent(filterCategory)}`;
-    }
-    
-    // Retrieve token from local storage or wherever it is stored
+    const url = `${baseUrl}/issues/admin/export.pdf?status=${encodeURIComponent(filterStatus)}`;
     const token = localStorage.getItem('accessToken') || localStorage.getItem('token'); 
     
-    // Create a temporary link element to trigger the download, since we need to pass the Authorization header,
-    // we fetch it as a blob first.
     fetch(url, {
       headers: {
         'Authorization': `Bearer ${token}`
@@ -152,7 +129,7 @@ export default function AdminIssues() {
       const windowUrl = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = windowUrl;
-      a.download = `Issues_Export_${new Date().toISOString().split('T')[0]}.pdf`;
+      a.download = `Complaints_Export_${new Date().toISOString().split('T')[0]}.pdf`;
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -166,34 +143,13 @@ export default function AdminIssues() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col-reverse sm:flex-row justify-between items-start sm:items-end border-b border-hairline mb-6 gap-3 sm:gap-0">
-        <div className="flex overflow-x-auto w-full sm:w-auto no-scrollbar">
-          <button
-            onClick={() => { setFilterCategory('ALL'); setCurrentPage(1); }}
-            className={`py-3 px-4 border-b-2  text-body whitespace-nowrap transition-colors -mb-[1px] ${
-              filterCategory === 'ALL'
-                ? 'border-ink text-ink'
-                : 'border-transparent text-muted hover:text-ink hover:border-hairline'
-            }`}
-          >
-            All
-          </button>
-          {categories.map(c => (
-            <button
-              key={c}
-              onClick={() => { setFilterCategory(c); setCurrentPage(1); }}
-              className={`py-3 px-4 border-b-2  text-body whitespace-nowrap capitalize transition-colors -mb-[1px] ${
-                filterCategory === c
-                  ? 'border-ink text-ink'
-                  : 'border-transparent text-muted hover:text-ink hover:border-hairline'
-              }`}
-            >
-              {c}
-            </button>
-          ))}
+      <div className="flex flex-col-reverse sm:flex-row justify-between items-start sm:items-end border-b border-hairline mb-6 gap-3 sm:gap-0 pb-3">
+        <div>
+          <h2 className="text-card-title text-ink">Complaints</h2>
+          <p className="text-body-sm text-muted">Review and resolve mess complaints reported by students</p>
         </div>
         
-        <div className="flex items-center gap-3 pb-2 w-full md:w-auto">
+        <div className="flex items-center gap-3 w-full sm:w-auto">
           <Select
             value={filterStatus}
             onChange={e => { setFilterStatus(e.target.value); setCurrentPage(1); }}
@@ -203,17 +159,6 @@ export default function AdminIssues() {
             <option value="CLOSED">Closed</option>
             <option value="ALL">All Statuses</option>
           </Select>
-          <Select
-            value={filterPriority}
-            onChange={e => { setFilterPriority(e.target.value); setCurrentPage(1); }}
-            className="w-[140px]"
-          >
-            <option value="ALL">All Priorities</option>
-            <option value="LOW">Low</option>
-            <option value="MEDIUM">Medium</option>
-            <option value="HIGH">High</option>
-            <option value="URGENT">Urgent</option>
-          </Select>
           <Button onClick={handleDownloadPdf} variant="secondary" className="h-9 px-4 text-caption whitespace-nowrap">
             Download PDF
           </Button>
@@ -221,11 +166,11 @@ export default function AdminIssues() {
       </div>
 
       {loading && (
-        <div className="p-8 text-center text-body text-muted">Loading issues...</div>
+        <div className="p-8 text-center text-body text-muted">Loading complaints...</div>
       )}
 
       {!loading && filteredIssues.length === 0 && (
-        <div className="p-8 text-center text-body text-muted">No issues found matching your filters.</div>
+        <div className="p-8 text-center text-body text-muted">No complaints found matching your filters.</div>
       )}
 
       {!loading && filteredIssues.length > 0 && (() => {
@@ -246,14 +191,14 @@ export default function AdminIssues() {
               <Table>
                 <TableHeader>
                 <TableRow className="bg-surface-soft">
-                  <TableHead className="text-center cursor-pointer hover:bg-surface transition-colors" onClick={() => handleSort('category')}>
+                  <TableHead className="text-center cursor-pointer hover:bg-surface transition-colors w-[180px]" onClick={() => handleSort('subject')}>
                     <div className="flex items-center justify-center gap-1">
-                      Category <span className="w-3 inline-block text-center">{sortConfig?.key === 'category' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}</span>
+                      Subject <span className="w-3 inline-block text-center">{sortConfig?.key === 'subject' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}</span>
                     </div>
                   </TableHead>
                   <TableHead className="w-[300px] cursor-pointer hover:bg-surface transition-colors" onClick={() => handleSort('description')}>
                     <div className="flex items-center gap-1">
-                      Issue <span className="w-3 inline-block text-center">{sortConfig?.key === 'description' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}</span>
+                      Complaint <span className="w-3 inline-block text-center">{sortConfig?.key === 'description' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}</span>
                     </div>
                   </TableHead>
                   <TableHead className="text-center cursor-pointer hover:bg-surface transition-colors" onClick={() => handleSort('raisedByName')}>
@@ -276,14 +221,9 @@ export default function AdminIssues() {
                       Status <span className="w-3 inline-block text-center">{sortConfig?.key === 'status' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}</span>
                     </div>
                   </TableHead>
-                  <TableHead className="text-center cursor-pointer hover:bg-surface transition-colors" onClick={() => handleSort('priority')}>
-                    <div className="flex items-center justify-center gap-1">
-                      Priority <span className="w-3 inline-block text-center">{sortConfig?.key === 'priority' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}</span>
-                    </div>
-                  </TableHead>
                   <TableHead className="text-center cursor-pointer hover:bg-surface transition-colors" onClick={() => handleSort('resolverNote')}>
                     <div className="flex items-center justify-center gap-1">
-                      Note <span className="w-3 inline-block text-center">{sortConfig?.key === 'resolverNote' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}</span>
+                      Remark <span className="w-3 inline-block text-center">{sortConfig?.key === 'resolverNote' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}</span>
                     </div>
                   </TableHead>
                 </TableRow>
@@ -291,8 +231,8 @@ export default function AdminIssues() {
               <TableBody>
                 {paginatedIssues.map((issue) => (
                   <TableRow key={issue._id} className="transition-colors hover:bg-surface-soft">
-                    <TableCell className="text-center capitalize text-ink">
-                      {issue.category}
+                    <TableCell className="text-center font-medium text-ink">
+                      {issue.subject}
                     </TableCell>
                     <TableCell className="max-w-[300px] leading-tight">
                       <p className={`${issue.status === 'CLOSED' ? 'line-through text-(--color-ink)/50' : 'text-(--color-ink)/80'}`}>
@@ -322,7 +262,7 @@ export default function AdminIssues() {
                           } else {
                             setClosePrompt({
                               issueId: issue._id,
-                              note: settings?.defaultResolverNote || "Fixed the issue as requested."
+                              note: ''
                             });
                           }
                         }}
@@ -331,7 +271,7 @@ export default function AdminIssues() {
                             ? 'text-(--color-semantic-success) hover:bg-(--color-semantic-success)/10'
                             : 'text-muted hover:text-(--color-ink) hover:bg-surface'
                         }`}
-                        title={issue.status === 'CLOSED' ? 'Reopen Issue' : 'Close Issue'}
+                        title={issue.status === 'CLOSED' ? 'Reopen Complaint' : 'Close Complaint'}
                       >
                         {issue.status === 'CLOSED' ? (
                           <CheckCircle className="w-5 h-5" />
@@ -339,11 +279,6 @@ export default function AdminIssues() {
                           <XCircle className="w-5 h-5" />
                         )}
                       </button>
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <Badge variant={issue.priority === 'URGENT' || issue.priority === 'HIGH' ? 'error' : 'warning'} className="px-2 py-1 rounded uppercase tracking-wider">
-                        {issue.priority}
-                      </Badge>
                     </TableCell>
                     <TableCell className="text-center text-muted max-w-[200px] truncate" title={issue.resolverNote || ''}>
                       {issue.resolverNote ? issue.resolverNote : '—'}
@@ -357,14 +292,15 @@ export default function AdminIssues() {
         );
       })()}
 
-      <Modal isOpen={!!closePrompt} onClose={() => setClosePrompt(null)} title="Resolve Issue">
+      <Modal isOpen={!!closePrompt} onClose={() => setClosePrompt(null)} title="Close Complaint">
         <div className="p-6">
-          <p className="text-body text-ink mb-4">Please provide a closing remark for the student.</p>
+          <p className="text-body text-ink mb-4">Please provide an optional closing remark for the student.</p>
           <Textarea
             value={closePrompt?.note || ''}
             onChange={(e) => closePrompt && setClosePrompt({ ...closePrompt, note: e.target.value })}
             className="w-full"
             rows={3}
+            placeholder="Add an optional admin remark..."
           />
           <div className="flex justify-end gap-3 mt-6">
             <Button variant="secondary" onClick={() => setClosePrompt(null)}>Cancel</Button>
@@ -373,7 +309,7 @@ export default function AdminIssues() {
                 handleStatusUpdate(closePrompt.issueId, 'CLOSED', closePrompt.note);
                 setClosePrompt(null);
               }
-            }}>Resolve Issue</Button>
+            }}>Close Complaint</Button>
           </div>
         </div>
       </Modal>

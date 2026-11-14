@@ -9,7 +9,6 @@ import {
   getMyIssues,
   updateIssueStatus,
   deleteIssue,
-  getIssueCategories
 } from '../controllers/issue.controller';
 
 const router = Router();
@@ -17,7 +16,6 @@ const router = Router();
 // Student routes - IMPORTANT: static routes must come before parameterized routes
 router.post('/', verifyToken, createIssue); // Student creates issue
 router.get('/my-issues', verifyToken, getMyIssues); // Student views their issues
-router.get('/categories', verifyToken, getIssueCategories); // Get active issue categories
 
 // Admin routes
 router.get('/admin/all', verifyToken, requireRole('ADMIN'), requirePermission('MANAGE_ISSUES'), getAllIssues); // Admin views all issues

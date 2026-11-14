@@ -11,14 +11,14 @@ const adminLinks = [
   { label: 'Users', to: '/admin/users' },
   { label: 'Menu Management', to: '/admin/menu' },
   { label: 'Dishes', to: '/admin/dishes' },
-  { label: 'Issues', to: '/admin/issues' },
+  { label: 'Complaints', to: '/admin/issues' },
   { label: 'Settings', to: '/admin/settings' }
 ]
 
 const studentLinks = [
   { label: 'Dashboard', to: '/student/dashboard' },
   { label: 'Menu Voting', to: '/student/voting/status' },
-  { label: 'Issues', to: '/student/issues' },
+  { label: 'Complaints', to: '/student/issues' },
   { label: 'Stats', to: '/student/stats' }
 ]
 

@@ -55,7 +55,7 @@ export default function AdminRegister() {
       });
       
       // Auto-login the user after registration
-      login(res.accessToken, res.user);
+      await login({ email: res.user.username, password: formData.adminPassword });
       
       navigate('/admin');
     } catch (err) {
@@ -132,3 +132,4 @@ export default function AdminRegister() {
     </div>
   );
 }
+

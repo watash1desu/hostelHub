@@ -3,12 +3,10 @@ import { Request, Response } from 'express';
 import { createIssue } from '../controllers/issue.controller';
 import { Issue } from '../models/Issue';
 import { User } from '../models/User';
-import { Hostel } from '../models/Hostel';
 
 // Mock mongoose models
 vi.mock('../models/Issue');
 vi.mock('../models/User');
-vi.mock('../models/Hostel');
 
 describe('Issue Controller - createIssue', () => {
   it('should return 400 if fields are missing', async () => {
@@ -25,12 +23,12 @@ describe('Issue Controller - createIssue', () => {
     await createIssue(req as any, res);
 
     expect(res.status).toHaveBeenCalledWith(400);
-    expect(res.json).toHaveBeenCalledWith({ message: 'All fields (category, priority, description) are required' });
+    expect(res.json).toHaveBeenCalledWith({ message: 'All fields (subject, description) are required' });
   });
 
-  it('should return 400 if priority is invalid', async () => {
+  it('should return 400 if subject exceeds 80 characters', async () => {
     const req = {
-      body: { category: 'Plumbing', priority: 'INVALID', description: 'Test' },
+      body: { subject: 'a'.repeat(81), description: 'Test' },
       user: { _id: 'user123' }
     } as unknown as Request;
     
@@ -42,6 +40,6 @@ describe('Issue Controller - createIssue', () => {
     await createIssue(req as any, res);
 
     expect(res.status).toHaveBeenCalledWith(400);
-    expect(res.json).toHaveBeenCalledWith({ message: 'Invalid priority level' });
+    expect(res.json).toHaveBeenCalledWith({ message: 'Subject must be 80 characters or less' });
   });
 });
