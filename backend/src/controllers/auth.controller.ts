@@ -65,7 +65,7 @@ export const registerAdmin = async (req: Request, res: Response): Promise<void> 
       email: adminEmail,
       role: 'ADMIN',
       isPrimaryAdmin: true,
-      permissions: ['MANAGE_USERS', 'MANAGE_MENU', 'MANAGE_ISSUES', 'MANAGE_SETTINGS'],
+      permissions: ['MANAGE_MENU', 'MANAGE_ISSUES'],
       passwordHash,
     });
     await user.save({ session });
@@ -171,3 +171,4 @@ export const logout = async (req: Request, res: Response): Promise<void> => {
     }
     res.json({ message: 'Logged out successfully' });
 };
+

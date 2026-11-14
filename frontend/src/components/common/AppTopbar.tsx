@@ -6,13 +6,13 @@ import { Button } from '@/components/ui/button'
 import { ThemeToggle } from './ThemeToggle'
 import ProfileModal from './ProfileModal'
 
-const adminLinks = [
+const allAdminLinks = [
   { label: 'Dashboard', to: '/admin/dashboard' },
-  { label: 'Users', to: '/admin/users' },
-  { label: 'Menu Management', to: '/admin/menu' },
-  { label: 'Dishes', to: '/admin/dishes' },
-  { label: 'Complaints', to: '/admin/issues' },
-  { label: 'Settings', to: '/admin/settings' }
+  { label: 'Users', to: '/admin/users', primaryOnly: true },
+  { label: 'Menu Management', to: '/admin/menu', permission: 'MANAGE_MENU' },
+  { label: 'Dishes', to: '/admin/dishes', permission: 'MANAGE_MENU' },
+  { label: 'Complaints', to: '/admin/issues', permission: 'MANAGE_ISSUES' },
+  { label: 'Settings', to: '/admin/settings', primaryOnly: true }
 ]
 
 const studentLinks = [
@@ -40,12 +40,18 @@ export default function AppTopbar() {
     navigate('/login')
   }
 
-  // Determine which links to show based on role
+  // Determine which links to show based on role & permissions
   let activeLinks: { label: string; to: string }[] = []
   let homeRoute = '/'
   
   if (user?.role === 'ADMIN') {
-    activeLinks = adminLinks
+    activeLinks = allAdminLinks.filter(link => {
+      if (!link.primaryOnly && !link.permission) return true
+      if (user.isPrimaryAdmin) return true
+      if (link.primaryOnly) return false
+      if (link.permission && user.permissions?.includes(link.permission)) return true
+      return false
+    })
     homeRoute = '/admin/dashboard'
   } else if (user?.role === 'STUDENT') {
     activeLinks = studentLinks

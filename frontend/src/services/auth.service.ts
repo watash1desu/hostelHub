@@ -91,6 +91,8 @@ export interface UserData {
   role: 'ADMIN' | 'STUDENT';
   hostelId?: string;
   isPrimaryAdmin?: boolean;
+  roleTitle?: string;
+  permissions?: string[];
 }
 
 export interface LoginResponse {
@@ -244,3 +246,4 @@ class AuthService {
 }
 
 export const authService = new AuthService();
+

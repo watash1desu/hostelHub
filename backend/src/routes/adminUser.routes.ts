@@ -11,14 +11,14 @@ import {
 } from '../controllers/adminUser.controller';
 import { verifyToken } from '../middlewares/verifyToken.middleware';
 import { requireRole } from '../middlewares/requireRole.middleware';
-import { requirePermission } from '../middlewares/requirePermission.middleware';
+import { requirePrimaryAdmin } from '../middlewares/requirePrimaryAdmin.middleware';
 
 const router = Router();
 
-// All routes require admin authentication and MANAGE_USERS permission
+// All user management routes require primary admin
 router.use(verifyToken);
 router.use(requireRole('ADMIN'));
-router.use(requirePermission('MANAGE_USERS'));
+router.use(requirePrimaryAdmin);
 
 // Create user
 router.post('/', createUser);
@@ -43,7 +43,5 @@ router.patch('/:userId/reactivate', reactivateUser);
 
 // Delete user
 router.delete('/:userId', deleteUser);
-
-// Deleted setup url regeneration
 
 export default router;

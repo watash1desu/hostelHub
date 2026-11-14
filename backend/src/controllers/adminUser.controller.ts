@@ -18,7 +18,7 @@ const generatePassword = (): string => {
 // Create User (Student/Worker)
 export const createUser = async (req: Request, res: Response) => {
     const adminId = (req as any).user?._id;
-    let { username, password, name, role, roomNo, permissions } = req.body;
+    let { username, password, name, role, roomNo, permissions, roleTitle } = req.body;
 
     if (!role) {
       return res.status(400).json({ message: 'Role is required' });
@@ -73,6 +73,7 @@ export const createUser = async (req: Request, res: Response) => {
       username,
       role,
       roomNo,
+      roleTitle: role === 'ADMIN' ? roleTitle : null,
       permissions: role === 'ADMIN' ? permissions : [],
       passwordHash
     });
@@ -325,12 +326,13 @@ export const deleteUser = async (req: Request, res: Response) => {
 
 export const updateUser = asyncHandler(async (req: Request, res: Response) => {
     const { id } = req.params;
-    const { name, roomNo, permissions } = req.body;
+    const { name, roomNo, permissions, roleTitle } = req.body;
     const userToUpdate = await User.findById(id);
     if (!userToUpdate) return res.status(404).json({ message: 'User not found' });
 
     if (name !== undefined) userToUpdate.name = name;
     if (permissions !== undefined) userToUpdate.permissions = permissions;
+    if (roleTitle !== undefined) userToUpdate.roleTitle = roleTitle;
     
     if (roomNo !== undefined && userToUpdate.role === 'STUDENT') {
         userToUpdate.roomNo = roomNo;
@@ -339,3 +341,4 @@ export const updateUser = asyncHandler(async (req: Request, res: Response) => {
     await userToUpdate.save();
     return res.status(200).json({ user: userToUpdate });
 });
+

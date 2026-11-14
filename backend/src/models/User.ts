@@ -9,10 +9,11 @@ const userSchema = new mongoose.Schema(
     passwordHash: { type: String, required: true },
     passwordChangedAt: { type: Date, default: Date.now },
     role: { type: String, enum: ['ADMIN', 'STUDENT'], required: true },
+    roleTitle: { type: String, default: null },
     isPrimaryAdmin: { type: Boolean, default: false },
     permissions: {
       type: [String],
-      enum: ['MANAGE_USERS', 'MANAGE_MENU', 'MANAGE_ISSUES', 'MANAGE_SETTINGS'],
+      enum: ['MANAGE_MENU', 'MANAGE_ISSUES'],
       default: []
     },
     roomNo: { type: String },

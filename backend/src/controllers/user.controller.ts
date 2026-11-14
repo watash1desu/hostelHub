@@ -20,6 +20,7 @@ export const getMe = async (req: Request, res: Response) => {
       username: dbUser.username ?? null,
       roomNo: dbUser.roomNo ?? null,
       isPrimaryAdmin: dbUser.isPrimaryAdmin,
+      roleTitle: dbUser.roleTitle ?? null,
       permissions: dbUser.permissions
     });
 };
@@ -81,3 +82,4 @@ export const updateProfile = async (req: Request, res: Response): Promise<void> 
       }
     });
 };
+

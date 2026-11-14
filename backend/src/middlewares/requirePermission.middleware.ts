@@ -1,7 +1,7 @@
 import { NextFunction, Request, Response } from 'express';
 import { User } from '../models/User';
 
-export const requirePermission = (requiredPermission: 'MANAGE_USERS' | 'MANAGE_MENU' | 'MANAGE_ISSUES' | 'MANAGE_SETTINGS') => async (req: Request, res: Response, next: NextFunction) => {
+export const requirePermission = (requiredPermission: 'MANAGE_MENU' | 'MANAGE_ISSUES') => async (req: Request, res: Response, next: NextFunction) => {
   try {
     if (!req.user) {
       return res.status(401).json({ message: 'Unauthorized' });

@@ -22,6 +22,7 @@ interface User {
   roomNo?: string
   isActive: boolean
   isPrimaryAdmin?: boolean
+  roleTitle?: string
   permissions?: string[]
 }
 
@@ -212,7 +213,7 @@ export default function AdminUsers() {
                         Room No <span className="w-3 inline-block text-center">{sortConfig?.key === 'roomNo' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}</span>
                       </TableHead>
                     ) : (
-                      <TableHead className="text-center w-[20%]">Permissions</TableHead>
+                      <TableHead className="text-center w-[20%]">Role</TableHead>
                     )}
                     <TableHead className="text-center w-[10%] min-w-[100px] cursor-pointer hover:bg-hairline/20 transition-colors" onClick={() => handleSort('isActive')}>
                       Status <span className="w-3 inline-block text-center">{sortConfig?.key === 'isActive' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}</span>
@@ -237,15 +238,9 @@ export default function AdminUsers() {
                         {user.isPrimaryAdmin ? (
                           <Badge variant="default" className="text-[10px]">Primary Admin</Badge>
                         ) : (
-                          <div className="flex flex-wrap justify-center gap-1">
-                            {user.permissions && user.permissions.length > 0 ? (
-                              user.permissions.map(p => (
-                                <Badge key={p} variant="outline" className="text-[10px]">{p.replace('MANAGE_', '')}</Badge>
-                              ))
-                            ) : (
-                              <span className="text-body-xs italic text-muted">No permissions</span>
-                            )}
-                          </div>
+                          <Badge variant="outline" className="text-[10px]">
+                            {user.roleTitle || (user.permissions?.includes("MANAGE_MENU") ? "Mess Manager" : user.permissions?.includes("MANAGE_ISSUES") ? "Complaints Officer" : "Admin")}
+                          </Badge>
                         )}
                       </TableCell>
                     )}
@@ -335,3 +330,5 @@ export default function AdminUsers() {
     </div>
   )
 }
+
+

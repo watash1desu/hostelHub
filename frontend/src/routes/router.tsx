@@ -16,7 +16,6 @@ class ErrorBoundary extends React.Component<{children: React.ReactNode}, {hasErr
   }
 }
 
-
 // App Layout (Keep synchronous)
 import AppLayout from '../components/common/AppLayout'
 
@@ -24,7 +23,6 @@ import AppLayout from '../components/common/AppLayout'
 const Login = lazy(() => import('../pages/Login'))
 const Home = lazy(() => import('../pages/Home'))
 const AdminRegister = lazy(() => import('../pages/admin/AdminRegister'))
-
 
 const AdminDashboard = lazy(() => import('../pages/admin/AdminDashboard'))
 const AdminUsers = lazy(() => import('../pages/admin/AdminUsers'))
@@ -72,6 +70,24 @@ const ProtectedRoute = ({ children, allowedRoles }: { children: React.ReactNode,
   return <>{children}</>
 }
 
+// Admin permission route guard
+const AdminPermissionRoute = ({
+  children,
+  permission,
+  primaryOnly
+}: {
+  children: React.ReactNode
+  permission?: string
+  primaryOnly?: boolean
+}) => {
+  const { user } = useAuth()
+  if (!user || user.role !== 'ADMIN') return <Navigate to="/login" replace />
+  if (user.isPrimaryAdmin) return <>{children}</>
+  if (primaryOnly) return <Navigate to="/admin/dashboard" replace />
+  if (permission && user.permissions?.includes(permission)) return <>{children}</>
+  return <Navigate to="/admin/dashboard" replace />
+}
+
 export default function AppRoutes() {
   return (
     <ErrorBoundary>
@@ -87,11 +103,11 @@ export default function AppRoutes() {
           {/* ───── ADMIN ───── */}
           <Route path="/admin" element={<ProtectedRoute allowedRoles={['ADMIN']}><AppLayout /></ProtectedRoute>}>
             <Route path="dashboard" element={<AdminDashboard />} /> 
-            <Route path="users" element={<AdminUsers />} />
-            <Route path="menu" element={<AdminMessMenu />} />
-            <Route path="issues" element={<AdminIssues />} />
-            <Route path="dishes" element={<AdminDishes />} />
-            <Route path="settings" element={<AdminSettings />} />
+            <Route path="users" element={<AdminPermissionRoute primaryOnly><AdminUsers /></AdminPermissionRoute>} />
+            <Route path="menu" element={<AdminPermissionRoute permission="MANAGE_MENU"><AdminMessMenu /></AdminPermissionRoute>} />
+            <Route path="issues" element={<AdminPermissionRoute permission="MANAGE_ISSUES"><AdminIssues /></AdminPermissionRoute>} />
+            <Route path="dishes" element={<AdminPermissionRoute permission="MANAGE_MENU"><AdminDishes /></AdminPermissionRoute>} />
+            <Route path="settings" element={<AdminPermissionRoute primaryOnly><AdminSettings /></AdminPermissionRoute>} />
             <Route index element={<Navigate to="dashboard" replace />} />
           </Route>
 
@@ -103,7 +119,6 @@ export default function AppRoutes() {
             <Route path="stats" element={<StudentStats />} />
             <Route index element={<Navigate to="dashboard" replace />} />
           </Route>
-
 
           {/* ───── DEFAULT ───── */}
           <Route path="*" element={<Navigate to="/" replace />} />

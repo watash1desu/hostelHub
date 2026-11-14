@@ -45,7 +45,7 @@ export function CreateUserModal({ isOpen, onClose, onSuccess, currentUser }: any
             <Select
               className="w-full"
               value={form.role}
-              onChange={(e) => setForm({ ...form, role: e.target.value, roomNo: '', permissions: [] })}
+              onChange={(e) => setForm({ ...form, role: e.target.value, roomNo: '', permissions: [], roleTitle: '' })}
             >
               <option value="STUDENT">Student</option>
               {currentUser?.isPrimaryAdmin && <option value="ADMIN">Admin</option>}
@@ -63,25 +63,26 @@ export function CreateUserModal({ isOpen, onClose, onSuccess, currentUser }: any
           )}
           {form.role === 'ADMIN' && (
             <div>
-              <label className="block text-body-sm mb-2">Permissions</label>
-              <div className="grid grid-cols-2 gap-2">
-                {['MANAGE_USERS', 'MANAGE_MENU', 'MANAGE_ISSUES', 'MANAGE_SETTINGS'].map(p => (
-                  <label key={p} className="flex items-center gap-2 text-body-sm capitalize">
-                    <input
-                      type="checkbox"
-                      checked={(form.permissions || []).includes(p)}
-                      onChange={(e) => {
-                        const newPerms = e.target.checked 
-                          ? [...(form.permissions || []), p]
-                          : (form.permissions || []).filter((x: string) => x !== p);
-                        setForm({ ...form, permissions: newPerms });
-                      }}
-                      className="rounded border-(--color-hairline) text-(--color-primary) focus:ring-(--color-primary)"
-                    />
-                    {p.replace('MANAGE_', '').toLowerCase()}
-                  </label>
-                ))}
-              </div>
+              <label className="block text-body-sm mb-1">Admin Role</label>
+              <Select
+                className="w-full"
+                value={form.roleTitle || ''}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (val === 'Mess Manager') {
+                    setForm({ ...form, roleTitle: 'Mess Manager', permissions: ['MANAGE_MENU'] });
+                  } else if (val === 'Complaints Officer') {
+                    setForm({ ...form, roleTitle: 'Complaints Officer', permissions: ['MANAGE_ISSUES'] });
+                  } else {
+                    setForm({ ...form, roleTitle: '', permissions: [] });
+                  }
+                }}
+                required
+              >
+                <option value="">Select role...</option>
+                <option value="Mess Manager">Mess Manager</option>
+                <option value="Complaints Officer">Complaints Officer</option>
+              </Select>
             </div>
           )}
           <div>
@@ -288,6 +289,7 @@ export function EditUserModal({ isOpen, onClose, onSuccess, user }: any) {
       setEditForm({
         name: user.name || '',
         roomNo: user.roomNo || '',
+        roleTitle: user.roleTitle || (user.permissions?.includes('MANAGE_MENU') ? 'Mess Manager' : user.permissions?.includes('MANAGE_ISSUES') ? 'Complaints Officer' : ''),
         permissions: user.permissions || [],
       })
     }
@@ -331,25 +333,25 @@ export function EditUserModal({ isOpen, onClose, onSuccess, user }: any) {
         )}
         {user?.role === 'ADMIN' && (
           <div>
-            <label className="block text-body-sm mb-2">Permissions</label>
-            <div className="grid grid-cols-2 gap-2">
-              {['MANAGE_USERS', 'MANAGE_MENU', 'MANAGE_ISSUES', 'MANAGE_SETTINGS'].map(p => (
-                <label key={p} className="flex items-center gap-2 text-body-sm capitalize">
-                  <input
-                    type="checkbox"
-                    checked={(editForm.permissions || []).includes(p)}
-                    onChange={(e) => {
-                      const newPerms = e.target.checked 
-                        ? [...(editForm.permissions || []), p]
-                        : (editForm.permissions || []).filter((x: string) => x !== p);
-                      setEditForm({ ...editForm, permissions: newPerms });
-                    }}
-                    className="rounded border-(--color-hairline) text-(--color-primary) focus:ring-(--color-primary)"
-                  />
-                  {p.replace('MANAGE_', '').toLowerCase()}
-                </label>
-              ))}
-            </div>
+            <label className="block text-body-sm mb-1">Admin Role</label>
+            <Select
+              className="w-full"
+              value={editForm.roleTitle || ''}
+              onChange={(e) => {
+                const val = e.target.value;
+                if (val === 'Mess Manager') {
+                  setEditForm({ ...editForm, roleTitle: 'Mess Manager', permissions: ['MANAGE_MENU'] });
+                } else if (val === 'Complaints Officer') {
+                  setEditForm({ ...editForm, roleTitle: 'Complaints Officer', permissions: ['MANAGE_ISSUES'] });
+                } else {
+                  setEditForm({ ...editForm, roleTitle: '', permissions: [] });
+                }
+              }}
+            >
+              <option value="">Select admin role...</option>
+              <option value="Mess Manager">Mess Manager</option>
+              <option value="Complaints Officer">Complaints Officer</option>
+            </Select>
           </div>
         )}
         <div className="bg-surface-soft p-3 rounded border border-hairline text-body-sm text-muted">

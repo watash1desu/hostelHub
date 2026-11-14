@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useApi } from '../../hooks/useApi';
+import { useAuth } from '../../hooks/useAuth';
 import toast from 'react-hot-toast';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/table';
@@ -7,8 +8,13 @@ import { formatDate } from '../../lib/utils';
 
 export default function AdminDashboard() {
   const { request } = useApi();
+  const { user } = useAuth();
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+
+  const canViewUsers = user?.isPrimaryAdmin;
+  const canViewMenu = user?.isPrimaryAdmin || user?.permissions?.includes('MANAGE_MENU');
+  const canViewIssues = user?.isPrimaryAdmin || user?.permissions?.includes('MANAGE_ISSUES');
 
   useEffect(() => {
     fetchDashboardData();
@@ -48,36 +54,44 @@ export default function AdminDashboard() {
       {/* Summary Cards Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Total Students */}
-        <div className="bg-canvas p-4 sm:rounded border-y sm:border-x border-hairline flex flex-col justify-between transition">
-          <div className="flex justify-between items-start">
-            <h3 className="text-muted text-body-sm">Registered Students</h3>
+        {canViewUsers && (
+          <div className="bg-canvas p-4 sm:rounded border-y sm:border-x border-hairline flex flex-col justify-between transition">
+            <div className="flex justify-between items-start">
+              <h3 className="text-muted text-body-sm">Registered Students</h3>
+            </div>
+            <p className="text-data font-mono mt-4">{stats.totalStudents}</p>
           </div>
-          <p className="text-data font-mono mt-4">{stats.totalStudents}</p>
-        </div>
+        )}
 
         {/* Active Dishes */}
-        <div className="bg-canvas p-4 sm:rounded border-y sm:border-x border-hairline flex flex-col justify-between transition">
-          <div className="flex justify-between items-start">
-            <h3 className="text-muted text-body-sm">Active Dishes</h3>
+        {canViewMenu && (
+          <div className="bg-canvas p-4 sm:rounded border-y sm:border-x border-hairline flex flex-col justify-between transition">
+            <div className="flex justify-between items-start">
+              <h3 className="text-muted text-body-sm">Active Dishes</h3>
+            </div>
+            <p className="text-data font-mono mt-4">{stats.activeDishes}</p>
           </div>
-          <p className="text-data font-mono mt-4">{stats.activeDishes}</p>
-        </div>
+        )}
 
         {/* Open Complaints */}
-        <div className="bg-canvas p-4 sm:rounded border-y sm:border-x border-hairline flex flex-col justify-between transition">
-          <div className="flex justify-between items-start">
-            <h3 className="text-muted text-body-sm">Open Complaints</h3>
+        {canViewIssues && (
+          <div className="bg-canvas p-4 sm:rounded border-y sm:border-x border-hairline flex flex-col justify-between transition">
+            <div className="flex justify-between items-start">
+              <h3 className="text-muted text-body-sm">Open Complaints</h3>
+            </div>
+            <p className="text-data font-mono mt-4 text-semantic-error">{stats.openIssues}</p>
           </div>
-          <p className="text-data font-mono mt-4 text-semantic-error">{stats.openIssues}</p>
-        </div>
+        )}
 
         {/* Total Votes */}
-        <div className="bg-canvas p-4 sm:rounded border-y sm:border-x border-hairline flex flex-col justify-between transition">
-          <div className="flex justify-between items-start">
-            <h3 className="text-muted text-body-sm">Total Votes</h3>
+        {canViewMenu && (
+          <div className="bg-canvas p-4 sm:rounded border-y sm:border-x border-hairline flex flex-col justify-between transition">
+            <div className="flex justify-between items-start">
+              <h3 className="text-muted text-body-sm">Total Votes</h3>
+            </div>
+            <p className="text-data font-mono mt-4 text-ink">{stats.totalVotes}</p>
           </div>
-          <p className="text-data font-mono mt-4 text-ink">{stats.totalVotes}</p>
-        </div>
+        )}
       </div>
 
       {/* Activity Log Section */}
@@ -130,4 +144,3 @@ export default function AdminDashboard() {
     </div>
   );
 }
-
