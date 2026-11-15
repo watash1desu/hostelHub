@@ -31,7 +31,10 @@ export default function SetNewPassword() {
 
     setLoading(true)
     try {
-      await request('/users/me', 'PATCH', { password })
+      const res = await request('/users/profile', 'PUT', { password })
+      if (res?.accessToken) {
+        localStorage.setItem('accessToken', res.accessToken)
+      }
       updateUser({ mustChangePassword: false })
       navigate(`/${user!.role.toLowerCase()}/dashboard`, { replace: true })
     } catch (err) {

@@ -24,6 +24,7 @@ export interface JWTPayload {
   username: string;
   role: string;
   hostelId: string;
+  mustChangePassword?: boolean;
 }
 
 export const generateAccessToken = (payload: JWTPayload): string => {
@@ -102,7 +103,8 @@ export const refreshAccessToken = async (userId: string): Promise<{ accessToken:
     userId: user._id.toString(),
     username: user.username,
     role: user.role,
-    hostelId: user.hostelId.toString()
+    hostelId: user.hostelId.toString(),
+    mustChangePassword: user.mustChangePassword ?? false,
   };
   
   const accessToken = generateAccessToken(payload);

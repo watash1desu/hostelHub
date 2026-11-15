@@ -2,6 +2,7 @@
 import { Request, Response } from 'express';
 import { User } from '../models/User';
 import bcrypt from 'bcrypt';
+import { generateAccessToken } from '../utils/jwt';
 
 export const getMe = async (req: Request, res: Response) => {
     const userPayload = req.user as any;
@@ -61,6 +62,7 @@ export const updateProfile = async (req: Request, res: Response): Promise<void> 
       }
     }
 
+    let accessToken: string | undefined;
     if (password) {
       if (password.length < 8) {
         res.status(400).json({ message: 'Password must be at least 8 characters' });
@@ -68,19 +70,28 @@ export const updateProfile = async (req: Request, res: Response): Promise<void> 
       }
       dbUser.passwordHash = await bcrypt.hash(password, 10);
       dbUser.mustChangePassword = false;
+      accessToken = generateAccessToken({
+        userId: dbUser._id.toString(),
+        username: dbUser.username,
+        role: dbUser.role,
+        hostelId: dbUser.hostelId.toString(),
+        mustChangePassword: false,
+      });
     }
 
     await dbUser.save();
 
     res.json({
       message: 'Profile updated successfully',
+      accessToken,
       user: {
         id: dbUser._id,
         name: dbUser.name,
         email: dbUser.email,
         username: dbUser.username,
         role: dbUser.role,
-        roomNo: dbUser.roomNo
+        roomNo: dbUser.roomNo,
+        mustChangePassword: dbUser.mustChangePassword ?? false,
       }
     });
 };

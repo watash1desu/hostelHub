@@ -96,6 +96,13 @@ export const useApi = () => {
         const errorData = await response.json().catch(() => ({}));
         let errorMessage = errorData.message || errorData.error || `HTTP Error: ${response.status}`;
 
+        if (response.status === 403 && errorData.code === 'PASSWORD_CHANGE_REQUIRED') {
+          if (window.location.pathname !== '/set-password') {
+            window.location.href = '/set-password';
+          }
+          throw new Error('PASSWORD_CHANGE_REQUIRED');
+        }
+
         // Provide better error messages
         if (response.status === 403) {
           throw new Error('You do not have permission to perform this action.');

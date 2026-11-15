@@ -5,7 +5,8 @@ interface JwtPayload {
   userId: string;
   role: 'STUDENT' | 'ADMIN';
   hostelId: string;
-  email: string;
+  email?: string;
+  mustChangePassword?: boolean;
 }
 
 export const verifyToken = (
@@ -30,7 +31,8 @@ export const verifyToken = (
     req.user = {
       _id: decoded.userId as any,
       role: decoded.role,
-      hostelId: decoded.hostelId as any
+      hostelId: decoded.hostelId as any,
+      mustChangePassword: decoded.mustChangePassword ?? false,
     };
 
     next();

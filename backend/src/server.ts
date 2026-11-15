@@ -26,6 +26,7 @@ import adminDashboardRoutes from './routes/adminDashboard.routes';
 import adminSettingsRoutes from './routes/adminSettings.routes';
 
 import { verifyToken } from './middlewares/verifyToken.middleware';
+import { requirePasswordChanged } from './middlewares/requirePasswordChanged.middleware';
 import { requireRole } from './middlewares/requireRole.middleware';
 import { errorHandler } from './middlewares/errorHandler';
 
@@ -55,21 +56,21 @@ app.get('/', (_, res) => res.status(200).json({ message: 'Server Running' }));
 app.use('/api/auth', authRoutes);
 
 // Shared Protected Routes
-app.use('/api/users', verifyToken, userRoutes);
-app.use('/api/issues', verifyToken, issueRoutes);
-app.use('/api/dishes', verifyToken, dishRoutes);
-app.use('/api/reviews', verifyToken, mealReviewRoutes);
+app.use('/api/users', verifyToken, requirePasswordChanged, userRoutes);
+app.use('/api/issues', verifyToken, requirePasswordChanged, issueRoutes);
+app.use('/api/dishes', verifyToken, requirePasswordChanged, dishRoutes);
+app.use('/api/reviews', verifyToken, requirePasswordChanged, mealReviewRoutes);
 
 // Student Specific Routes (Handles Menu, Notifications, and Votes)
-app.use('/api/student', verifyToken, requireRole('STUDENT'), studentRoutes);
+app.use('/api/student', verifyToken, requirePasswordChanged, requireRole('STUDENT'), studentRoutes);
 
 // Admin Specific Routes
-app.use('/api/admin/menu', verifyToken, requireRole('ADMIN'), adminMenuRoutes);
-app.use('/api/admin/users', verifyToken, requireRole('ADMIN'), adminUserRoutes);
-app.use('/api/admin/dishes', verifyToken, requireRole('ADMIN'), adminDishRoutes);
-app.use('/api/admin/reviews', verifyToken, requireRole('ADMIN'), adminReviewRoutes);
-app.use('/api/admin/dashboard', verifyToken, requireRole('ADMIN'), adminDashboardRoutes);
-app.use('/api/admin/settings', verifyToken, requireRole('ADMIN'), adminSettingsRoutes);
+app.use('/api/admin/menu', verifyToken, requirePasswordChanged, requireRole('ADMIN'), adminMenuRoutes);
+app.use('/api/admin/users', verifyToken, requirePasswordChanged, requireRole('ADMIN'), adminUserRoutes);
+app.use('/api/admin/dishes', verifyToken, requirePasswordChanged, requireRole('ADMIN'), adminDishRoutes);
+app.use('/api/admin/reviews', verifyToken, requirePasswordChanged, requireRole('ADMIN'), adminReviewRoutes);
+app.use('/api/admin/dashboard', verifyToken, requirePasswordChanged, requireRole('ADMIN'), adminDashboardRoutes);
+app.use('/api/admin/settings', verifyToken, requirePasswordChanged, requireRole('ADMIN'), adminSettingsRoutes);
 
 // Global Error Handler
 app.use(errorHandler);

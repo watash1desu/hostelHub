@@ -8,6 +8,7 @@ declare global {
         email?: string;
         role: 'STUDENT' | 'ADMIN';
         hostelId: string | Types.ObjectId;
+        mustChangePassword?: boolean;
       };
     }
   }
