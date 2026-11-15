@@ -7,11 +7,16 @@ import { Select } from '../../../components/ui/select'
 import { Textarea } from '../../../components/ui/textarea'
 import { useApi } from '../../../hooks/useApi'
 
-export function CreateUserModal({ isOpen, onClose, onSuccess, currentUser }: any) {
+export function CreateUserModal({ isOpen, onClose, onSuccess, defaultRole }: any) {
   const { request } = useApi()
-  const [form, setForm] = useState<any>({ role: 'STUDENT' })
+  const fixedRole: string = defaultRole || 'STUDENT'
+  const [form, setForm] = useState<any>({ role: fixedRole })
   const [creating, setCreating] = useState(false)
   const [createdUser, setCreatedUser] = useState<any>(null)
+
+  useEffect(() => {
+    if (isOpen) setForm({ role: fixedRole })
+  }, [isOpen, fixedRole])
 
   const submitCreate = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -19,7 +24,7 @@ export function CreateUserModal({ isOpen, onClose, onSuccess, currentUser }: any
       setCreating(true)
       const res = await request('/admin/users', 'POST', form)
       setCreatedUser({ ...res.user, rawPassword: res.rawPassword })
-      setForm({ role: 'STUDENT' })
+      setForm({ role: fixedRole })
       onSuccess()
     } catch (err: unknown) {
       toast.error((err as Error).message || 'Failed to create user')
@@ -40,28 +45,8 @@ export function CreateUserModal({ isOpen, onClose, onSuccess, currentUser }: any
               onChange={(e) => setForm({ ...form, name: e.target.value })}
             />
           </div>
-          <div>
-            <label className="block text-body-sm mb-1">Role</label>
-            <Select
-              className="w-full"
-              value={form.role}
-              onChange={(e) => setForm({ ...form, role: e.target.value, roomNo: '', permissions: [], roleTitle: '' })}
-            >
-              <option value="STUDENT">Student</option>
-              {currentUser?.isPrimaryAdmin && <option value="ADMIN">Admin</option>}
-            </Select>
-          </div>
-          {form.role === 'STUDENT' && (
-            <div>
-              <label className="block text-body-sm mb-1">Room No</label>
-              <Input
-                required
-                value={form.roomNo || ''}
-                onChange={(e) => setForm({ ...form, roomNo: e.target.value })}
-              />
-            </div>
-          )}
-          {form.role === 'ADMIN' && (
+          {/* Show role select only when creating an ADMIN (fixedRole='ADMIN'); students always get STUDENT */}
+          {fixedRole === 'ADMIN' ? (
             <div>
               <label className="block text-body-sm mb-1">Admin Role</label>
               <Select
@@ -84,6 +69,15 @@ export function CreateUserModal({ isOpen, onClose, onSuccess, currentUser }: any
                 <option value="Complaints Officer">Complaints Officer</option>
               </Select>
             </div>
+          ) : (
+            <div>
+              <label className="block text-body-sm mb-1">Room No</label>
+              <Input
+                required
+                value={form.roomNo || ''}
+                onChange={(e) => setForm({ ...form, roomNo: e.target.value })}
+              />
+            </div>
           )}
           <div>
             <label className="block text-body-sm mb-1">Username / Login ID <span className="text-muted">(Optional)</span></label>
@@ -91,7 +85,7 @@ export function CreateUserModal({ isOpen, onClose, onSuccess, currentUser }: any
               autoComplete="off"
               value={form.username || ''}
               onChange={(e) => setForm({ ...form, username: e.target.value })}
-              placeholder={form.role === 'STUDENT' ? 'Auto-generated based on room no' : 'Auto-generated if empty'}
+              placeholder={fixedRole === 'STUDENT' ? 'Auto-generated based on room no' : 'Auto-generated if empty'}
             />
           </div>
           <div>
@@ -122,7 +116,6 @@ export function CreateUserModal({ isOpen, onClose, onSuccess, currentUser }: any
             <p className="text-muted text-body-sm mb-4">Username: <span className="font-mono text-ink">{createdUser?.username}</span></p>
             <p className="text-body-sm text-muted">Password: <span className="font-mono bg-surface-soft p-1 rounded text-ink">{createdUser?.rawPassword}</span></p>
           </div>
-          
           <div className="flex gap-3 pt-2">
             <Button className="w-full" onClick={() => { setCreatedUser(null); onClose(); }}>
               Done
@@ -134,144 +127,170 @@ export function CreateUserModal({ isOpen, onClose, onSuccess, currentUser }: any
   )
 }
 
-export function BulkCreateModal({ isOpen, onClose, onSuccess }: any) {
-  const { request } = useApi()
-  const [bulkInput, setBulkInput] = useState('')
-  const [bulkCreating, setBulkCreating] = useState(false)
+interface ParsedRow { name: string; roomNo: string }
+interface RowError { line: number; raw: string; message: string }
 
-  const submitBulkCreate = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!bulkInput.trim()) return
+function parseCsvRows(raw: string): { valid: ParsedRow[]; errors: RowError[] } {
+  const valid: ParsedRow[] = []
+  const errors: RowError[] = []
+  const seenRooms = new Set<string>()
 
-    try {
-      setBulkCreating(true)
-      const input = bulkInput.replace(/,/g, '\n')
-      const lines = input.split('\n').map(l => l.trim()).filter(Boolean)
-      
-      const expandedRooms = lines.flatMap(line => {
-        const match = line.match(/^([a-zA-Z\-_]*?)(\d+)\s*-\s*([a-zA-Z\-_]*?)(\d+)$/)
-        if (match) {
-          const prefix1 = match[1]
-          const startNum = parseInt(match[2], 10)
-          const prefix2 = match[3]
-          const endNum = parseInt(match[4], 10)
-
-          if ((prefix1 === prefix2 || prefix2 === '') && startNum <= endNum && endNum - startNum < 1000) {
-            const result = []
-            const padding = match[2].length
-            for (let i = startNum; i <= endNum; i++) {
-              let numStr = i.toString()
-              if (match[2].startsWith('0') && numStr.length < padding) {
-                numStr = numStr.padStart(padding, '0')
-              }
-              result.push(`${prefix1}${numStr}`)
-            }
-            return result
-          }
-        }
-        return [line]
-      })
-
-      const usersToCreate = expandedRooms.map(room => ({
-        roomNo: room,
-        role: 'STUDENT'
-      }))
-
-      const res = await request('/admin/users/bulk', 'POST', { users: usersToCreate })
-      toast.success(`Successfully created ${res.createdCount} users`)
-      setBulkInput('')
-      onSuccess()
-      onClose()
-    } catch (err: unknown) {
-      toast.error((err as Error).message || 'Failed to bulk create users')
-    } finally {
-      setBulkCreating(false)
-    }
+  const lines = raw.split('\n').map(l => l.trim()).filter(Boolean)
+  if (lines.length > 200) {
+    errors.push({ line: 0, raw: '', message: 'Maximum 200 rows allowed' })
+    return { valid: [], errors }
   }
 
-  return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Generate Students">
-      <form onSubmit={submitBulkCreate} className="p-6 space-y-4">
-        <div>
-          <label className="block text-body-sm mb-1">
-            Enter room numbers
-          </label>
-          <div className="text-body-xs text-muted mb-3 space-y-1">
-            <p>• <strong>Format:</strong> Comma-separated (101, 102), newlines, or ranges (A1-A20).</p>
-            <p>• <strong>Usernames:</strong> Auto-generated based on the room number.</p>
-            <p>• <strong>Password:</strong> The default password will be used.</p>
-            <p>• <strong>Name/Email:</strong> Left blank by default. Students can update these later.</p>
-          </div>
-          <Textarea
-            required
-            className="h-32"
-            placeholder="101, 102, 103&#10;104-110&#10;A1-A50"
-            value={bulkInput}
-            onChange={(e) => setBulkInput(e.target.value)}
-          />
-        </div>
-        <div className="flex justify-end pt-2">
-          <Button type="submit" disabled={bulkCreating || !bulkInput.trim()} className="w-full sm:w-auto px-6">
-            {bulkCreating ? 'Generating...' : 'Generate'}
-          </Button>
-        </div>
-      </form>
-    </Modal>
-  )
+  lines.forEach((line, i) => {
+    const lineNum = i + 1
+    const parts = line.split(',').map(s => s.trim())
+    const name = parts[0] || ''
+    const roomNo = parts[1] || ''
+
+    if (!name) { errors.push({ line: lineNum, raw: line, message: 'Name is required' }); return }
+    if (!roomNo) { errors.push({ line: lineNum, raw: line, message: 'Room number is required' }); return }
+    if (seenRooms.has(roomNo)) { errors.push({ line: lineNum, raw: line, message: `Duplicate room ${roomNo} in this import` }); return }
+
+    seenRooms.add(roomNo)
+    valid.push({ name, roomNo })
+  })
+
+  return { valid, errors }
+}
+
+function downloadCsv(rows: Array<{ username: string; name: string; roomNo: string }>, rawPassword: string) {
+  const header = 'name,roomNo,username,password'
+  const body = rows.map(r => `${r.name},${r.roomNo},${r.username},${rawPassword}`).join('\n')
+  const blob = new Blob([header + '\n' + body], { type: 'text/csv' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = 'student-credentials.csv'
+  a.click()
+  URL.revokeObjectURL(url)
 }
 
 export function CsvImportModal({ isOpen, onClose, onSuccess }: any) {
   const { request } = useApi()
   const [csvInput, setCsvInput] = useState('')
-  const [csvImporting, setCsvImporting] = useState(false)
+  const [preview, setPreview] = useState<{ valid: ParsedRow[]; errors: RowError[] } | null>(null)
+  const [importing, setImporting] = useState(false)
+  const [result, setResult] = useState<{ createdUsers: any[]; rawPassword: string; skipped: string[]; errors: any[] } | null>(null)
 
-  const submitCsvImport = async (e: React.FormEvent) => {
+  const handleParse = (e: React.FormEvent) => {
     e.preventDefault()
-    if (!csvInput.trim()) return
+    setPreview(parseCsvRows(csvInput))
+  }
 
+  const handleConfirm = async () => {
+    if (!preview || preview.valid.length === 0) return
     try {
-      setCsvImporting(true)
-      const lines = csvInput.split('\n').filter(l => l.trim())
-      const usersToCreate = lines.map(line => {
-        const parts = line.split(',').map(s => s.trim())
-        return {
-          name: parts[0],
-          roomNo: parts[1] || undefined,
-          role: (parts[2] || 'STUDENT').toUpperCase()
-        }
-      })
-
-      const res = await request('/admin/users/bulk', 'POST', { users: usersToCreate })
-      toast.success(`Successfully created ${res.createdCount} users`)
-      setCsvInput('')
+      setImporting(true)
+      const res = await request('/admin/users/bulk', 'POST', { users: preview.valid })
+      setResult(res)
       onSuccess()
-      onClose()
     } catch (err: unknown) {
-      toast.error((err as Error).message || 'Failed to import users')
+      toast.error((err as Error).message || 'Import failed')
     } finally {
-      setCsvImporting(false)
+      setImporting(false)
     }
   }
 
+  const handleClose = () => {
+    setCsvInput('')
+    setPreview(null)
+    setResult(null)
+    onClose()
+  }
+
+  if (result) {
+    return (
+      <Modal isOpen={isOpen} onClose={handleClose} title="Import Complete">
+        <div className="p-6 space-y-4">
+          <p className="text-body text-ink">{result.createdUsers.length} students imported successfully.</p>
+          {result.skipped.length > 0 && (
+            <p className="text-body-sm text-muted">{result.skipped.length} skipped (duplicates).</p>
+          )}
+          {result.errors.length > 0 && (
+            <p className="text-body-sm text-semantic-error">{result.errors.length} rows had errors.</p>
+          )}
+          {result.createdUsers.length > 0 && (
+            <Button variant="secondary" className="w-full" onClick={() => downloadCsv(result.createdUsers, result.rawPassword)}>
+              Download credentials CSV
+            </Button>
+          )}
+          <Button className="w-full" onClick={handleClose}>Done</Button>
+        </div>
+      </Modal>
+    )
+  }
+
+  if (preview) {
+    return (
+      <Modal isOpen={isOpen} onClose={handleClose} title="Preview Import">
+        <div className="p-6 space-y-4">
+          {preview.errors.length > 0 && (
+            <div className="space-y-1">
+              <p className="text-body-sm font-medium text-semantic-error">Errors ({preview.errors.length})</p>
+              <ul className="text-caption text-semantic-error space-y-0.5 max-h-32 overflow-y-auto">
+                {preview.errors.map((e, i) => (
+                  <li key={i}>Row {e.line}: {e.message} — <span className="font-mono">{e.raw}</span></li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {preview.valid.length > 0 && (
+            <div className="space-y-1">
+              <p className="text-body-sm font-medium">{preview.valid.length} valid row(s) ready to import</p>
+              <div className="max-h-48 overflow-y-auto border border-hairline rounded">
+                <table className="w-full text-caption">
+                  <thead className="bg-surface-soft"><tr><th className="p-2 text-left">Name</th><th className="p-2 text-left">Room</th></tr></thead>
+                  <tbody>
+                    {preview.valid.map((r, i) => (
+                      <tr key={i} className="border-t border-hairline"><td className="p-2">{r.name}</td><td className="p-2">{r.roomNo}</td></tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+          <div className="flex gap-3 pt-2">
+            <Button variant="secondary" onClick={() => setPreview(null)}>Back</Button>
+            <Button
+              className="flex-1"
+              disabled={importing || preview.valid.length === 0}
+              onClick={handleConfirm}
+            >
+              {importing ? 'Importing...' : `Confirm & Import ${preview.valid.length} students`}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+    )
+  }
+
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Bulk Import Users">
-      <form onSubmit={submitCsvImport} className="p-6 space-y-4">
+    <Modal isOpen={isOpen} onClose={handleClose} title="Bulk Import Students">
+      <form onSubmit={handleParse} className="p-6 space-y-4">
         <div>
           <label className="block text-body-sm mb-1">
-            Enter users (one per line, format: <code>Name, RoomNo, Role</code>)
+            One student per line: <code>Name, RoomNo</code>
           </label>
-          <p className="text-body-xs text-muted mb-2">Role defaults to STUDENT. Usernames are auto-generated if omitted. The default password is used if omitted.</p>
+          <p className="text-body-xs text-muted mb-2">
+            Max 200 rows. The hostel default password is used for all accounts.
+            Duplicate room numbers are skipped.
+          </p>
           <Textarea
             required
             className="h-40"
-            placeholder="John Doe, 101, STUDENT&#10;Jane Smith, 102&#10;Admin Guy, , ADMIN"
+            placeholder={'Alice Sharma, 101\nBob Kumar, 102\nCarol Patel, A3'}
             value={csvInput}
             onChange={(e) => setCsvInput(e.target.value)}
           />
         </div>
         <div className="flex justify-end pt-2">
-          <Button type="submit" disabled={csvImporting || !csvInput.trim()} className="w-full sm:w-auto px-6">
-            {csvImporting ? 'Importing...' : 'Import Users'}
+          <Button type="submit" disabled={!csvInput.trim()} className="w-full sm:w-auto px-6">
+            Preview
           </Button>
         </div>
       </form>

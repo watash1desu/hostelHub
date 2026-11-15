@@ -10,10 +10,8 @@ import { RefreshToken } from '../models/RefreshToken';
 import { Dish } from '../models/Dish';
 import { asyncHandler } from '../utils/asyncHandler';
 
-// generate simple password
-const generatePassword = (): string => {
-  return 'abcdefgh'; // 8 char hex
-};
+// Generate a random 12-char hex password
+const generatePassword = (): string => crypto.randomBytes(6).toString('hex');
 
 // Create User (Student/Worker)
 export const createUser = async (req: Request, res: Response) => {
@@ -75,7 +73,8 @@ export const createUser = async (req: Request, res: Response) => {
       roomNo,
       roleTitle: role === 'ADMIN' ? roleTitle : null,
       permissions: role === 'ADMIN' ? permissions : [],
-      passwordHash
+      passwordHash,
+      mustChangePassword: true,
     });
 
     await newUser.save();
@@ -98,13 +97,16 @@ export const createUser = async (req: Request, res: Response) => {
     });
 };
 
-// Bulk Create Users
+// Bulk Create Users (students-only, Name/RoomNo, 200-row cap)
 export const bulkCreateUsers = async (req: Request, res: Response) => {
     const adminId = (req as any).user?._id;
-    const { users } = req.body; // Array of { username, password, name?, role, roomNo? }
+    const { users } = req.body; // Array of { name, roomNo }
 
     if (!Array.isArray(users)) {
-      return res.status(400).json({ message: 'Users must be an array' });
+      return res.status(400).json({ message: 'users must be an array' });
+    }
+    if (users.length > 200) {
+      return res.status(400).json({ message: 'Cannot import more than 200 students at once' });
     }
 
     const admin = await User.findById(adminId);
@@ -117,66 +119,73 @@ export const bulkCreateUsers = async (req: Request, res: Response) => {
       return res.status(500).json({ message: 'Hostel information not found' });
     }
 
-    const createdUsers = [];
     const bcrypt = require('bcrypt');
+    const rawPassword = hostel.defaultPassword || generatePassword();
+    const passwordHash = await bcrypt.hash(rawPassword, 10);
 
-    for (const u of users) {
-      let { username, password, name, role, roomNo, permissions } = u;
-      
-      // Generate or format username
-      if (username) {
-        const suffix = `@${hostel.domain}`;
-        if (!username.endsWith(suffix)) {
-          username = `${username}${suffix}`;
-        }
-      } else {
-        if (role === 'STUDENT' && roomNo) {
-          const existingInRoom = await User.countDocuments({ hostelId: hostel._id, roomNo });
-          const nextId = existingInRoom + 1;
-          username = `${roomNo}.${nextId}@${hostel.domain}`;
-        } else if (role === 'ADMIN') {
-          const existingAdmins = await User.countDocuments({ hostelId: hostel._id, role: 'ADMIN' });
-          const nextId = existingAdmins + 1;
-          username = nextId === 1 ? `admin@${hostel.domain}` : `secadmin${nextId}@${hostel.domain}`;
-        } else {
-          continue; // skip invalid user
-        }
+    const createdUsers: { username: string; name: string; roomNo: string }[] = [];
+    const skipped: string[] = [];
+    const errors: { row: number; message: string }[] = [];
+    const seenRooms = new Set<string>();
+
+    for (let i = 0; i < users.length; i++) {
+      const { name, roomNo } = users[i] ?? {};
+      const rowNum = i + 1;
+
+      if (!name?.trim()) {
+        errors.push({ row: rowNum, message: 'Name is required' });
+        continue;
+      }
+      if (!roomNo?.trim()) {
+        errors.push({ row: rowNum, message: 'Room number is required' });
+        continue;
       }
 
-      const existingUser = await User.findOne({ username });
-      if (existingUser) continue; // skip duplicates
+      const normalRoom = roomNo.trim();
+      const normalName = name.trim();
 
-      const rawPassword = password || generatePassword();
-      const passwordHash = await bcrypt.hash(rawPassword, 10);
+      // Deduplicate within the batch
+      if (seenRooms.has(normalRoom)) {
+        skipped.push(`Row ${rowNum}: duplicate room ${normalRoom} in import`);
+        continue;
+      }
+      seenRooms.add(normalRoom);
+
+      const existingInRoom = await User.countDocuments({ hostelId: hostel._id, roomNo: normalRoom });
+      const nextId = existingInRoom + 1;
+      const username = `${normalRoom}.${nextId}@${hostel.domain}`;
+
+      const existing = await User.findOne({ username });
+      if (existing) {
+        skipped.push(`Row ${rowNum}: username ${username} already exists`);
+        continue;
+      }
 
       const newUser = new User({
         hostelId: admin.hostelId,
-        name,
+        name: normalName,
         username,
-        role: role || 'STUDENT',
-        roomNo,
-        permissions: role === 'ADMIN' ? permissions : [],
-        passwordHash
+        role: 'STUDENT',
+        roomNo: normalRoom,
+        passwordHash,
+        mustChangePassword: true,
       });
-
       await newUser.save();
-      createdUsers.push({
-        username: newUser.username,
-        rawPassword,
-        name: newUser.name,
-        role: newUser.role,
-        roomNo: newUser.roomNo
-      });
+      createdUsers.push({ username, name: normalName, roomNo: normalRoom });
     }
 
     await ActivityLog.create({
       hostelId: admin.hostelId,
       userId: adminId,
-      action: `Bulk created ${createdUsers.length} users`,});
+      action: `Bulk imported ${createdUsers.length} students`,
+    });
 
     return res.status(201).json({
-      message: `${createdUsers.length} users created successfully`,
-      createdUsers
+      message: `${createdUsers.length} students created`,
+      createdUsers,
+      rawPassword,
+      skipped,
+      errors,
     });
 };
 
@@ -322,7 +331,31 @@ export const deleteUser = async (req: Request, res: Response) => {
     return res.status(200).json({ message: 'User and all associated records deleted successfully' });
 };
 
-// TOKEN REGENERATION ROUTES DELETED
+// Reset a user's password (primary admin only)
+export const resetPassword = asyncHandler(async (req: Request, res: Response) => {
+    const adminId = (req as any).user?._id;
+    const { userId } = req.params;
+
+    const admin = await User.findById(adminId);
+    if (!admin) return res.status(403).json({ message: 'Forbidden' });
+
+    const target = await User.findOne({ _id: userId, hostelId: admin.hostelId });
+    if (!target) return res.status(404).json({ message: 'User not found' });
+
+    const tempPassword = generatePassword();
+    const bcrypt = require('bcrypt');
+    target.passwordHash = await bcrypt.hash(tempPassword, 10);
+    target.mustChangePassword = true;
+    await target.save();
+
+    await ActivityLog.create({
+      hostelId: admin.hostelId,
+      userId: adminId,
+      action: `Reset password for ${target.name || target.username} (${target.username})`,
+    });
+
+    return res.json({ tempPassword });
+});
 
 export const updateUser = asyncHandler(async (req: Request, res: Response) => {
     const { id } = req.params;

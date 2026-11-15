@@ -23,6 +23,7 @@ import AppLayout from '../components/common/AppLayout'
 const Login = lazy(() => import('../pages/Login'))
 const Home = lazy(() => import('../pages/Home'))
 const AdminRegister = lazy(() => import('../pages/admin/AdminRegister'))
+const SetNewPassword = lazy(() => import('../pages/SetNewPassword'))
 
 const AdminDashboard = lazy(() => import('../pages/admin/AdminDashboard'))
 const AdminUsers = lazy(() => import('../pages/admin/AdminUsers'))
@@ -63,6 +64,11 @@ const ProtectedRoute = ({ children, allowedRoles }: { children: React.ReactNode,
   if (!isAuthenticated || !user) {
     return <Navigate to="/login" state={{ from: location }} replace />
   }
+
+  // Force password change before accessing any protected page
+  if (user.mustChangePassword && location.pathname !== '/set-password') {
+    return <Navigate to="/set-password" replace />
+  }
   
   if (allowedRoles && !allowedRoles.includes(user.role)) {
     return <Navigate to={`/${user.role}/dashboard`} replace />
@@ -99,6 +105,7 @@ export default function AppRoutes() {
             <Route path="/" element={<PublicOnlyRoute><Home /></PublicOnlyRoute>} />
             <Route path="/login" element={<PublicOnlyRoute><Login /></PublicOnlyRoute>} />
             <Route path="/admin/register" element={<PublicOnlyRoute><AdminRegister /></PublicOnlyRoute>} />
+            <Route path="/set-password" element={<ProtectedRoute><SetNewPassword /></ProtectedRoute>} />
           </Route>
 
           {/* ───── ADMIN ───── */}

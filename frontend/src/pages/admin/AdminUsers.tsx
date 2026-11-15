@@ -10,8 +10,8 @@ import { Modal } from '../../components/ui/modal'
 import { Badge } from '../../components/ui/badge'
 
 import { Pagination } from '../../components/ui/pagination'
-import { Trash2, Ban, CheckCircle, Pencil } from 'lucide-react'
-import { CreateUserModal, BulkCreateModal, CsvImportModal, EditUserModal } from './components/UserModals'
+import { Trash2, Ban, CheckCircle, Pencil, KeyRound, Copy } from 'lucide-react'
+import { CreateUserModal, CsvImportModal, EditUserModal } from './components/UserModals'
 
 interface User {
   _id: string
@@ -91,9 +91,6 @@ export default function AdminUsers() {
 
 
 
-  // Bulk Create Users
-  const [isBulkModalOpen, setIsBulkModalOpen] = useState(false)
-
   // Bulk Import CSV
   const [isCsvModalOpen, setIsCsvModalOpen] = useState(false)
 
@@ -102,6 +99,17 @@ export default function AdminUsers() {
 
   const openEditModal = (user: User) => {
     setEditingUser(user)
+  }
+
+  const [resetPwdResult, setResetPwdResult] = useState<{ tempPassword: string; username: string } | null>(null)
+
+  const handleResetPassword = async (user: User) => {
+    try {
+      const res = await request(`/admin/users/${user._id}/reset-password`, 'PATCH')
+      setResetPwdResult({ tempPassword: res.tempPassword, username: user.username })
+    } catch (err: unknown) {
+      toast.error((err as Error).message || 'Failed to reset password')
+    }
   }
 
   // Toggle User Status (Deactivate / Reactivate)
@@ -144,11 +152,6 @@ export default function AdminUsers() {
           {activeTab === 'STUDENT' && (
             <Button onClick={() => setIsCsvModalOpen(true)} variant="secondary" className="h-8 text-caption px-3">
               Bulk Import CSV
-            </Button>
-          )}
-          {activeTab === 'STUDENT' && (
-            <Button onClick={() => setIsBulkModalOpen(true)} variant="secondary" className="h-8 text-caption px-3">
-              Generate Students
             </Button>
           )}
           <Button onClick={() => setIsCreateModalOpen(true)} className="h-8 text-caption px-3">
@@ -255,6 +258,15 @@ export default function AdminUsers() {
                       <div className="flex items-center justify-center gap-2">
                         {user._id !== currentUser?.id && !(user.role === 'ADMIN' && user.username.startsWith('admin@')) && (
                           <>
+                            {user.role === 'ADMIN' && (
+                              <button
+                                onClick={() => handleResetPassword(user)}
+                                className="p-1.5 rounded transition-colors text-muted hover:text-semantic-warning hover:bg-semantic-warning/10"
+                                title="Reset Password"
+                              >
+                                <KeyRound className="w-4 h-4" />
+                              </button>
+                            )}
                             <button
                               onClick={() => openEditModal(user)}
                               className="p-1.5 rounded transition-colors text-muted hover:text-(--color-primary) hover:bg-(--color-primary)/10"
@@ -294,12 +306,7 @@ export default function AdminUsers() {
         onClose={() => setIsCreateModalOpen(false)}
         onSuccess={fetchUsers}
         currentUser={currentUser}
-      />
-
-      <BulkCreateModal
-        isOpen={isBulkModalOpen}
-        onClose={() => setIsBulkModalOpen(false)}
-        onSuccess={fetchUsers}
+        defaultRole={activeTab}
       />
 
       <CsvImportModal
@@ -316,6 +323,18 @@ export default function AdminUsers() {
         }}
         user={editingUser}
       />
+
+      {/* RESET PASSWORD RESULT MODAL */}
+      <Modal isOpen={!!resetPwdResult} onClose={() => setResetPwdResult(null)} title="Password Reset">
+        <div className="p-6 space-y-4">
+          <p className="text-body-sm text-muted">Temporary password for <span className="font-mono text-ink">{resetPwdResult?.username}</span>. Share it once — it won't be shown again.</p>
+          <div className="flex items-center gap-2 bg-surface-soft p-3 rounded border border-hairline">
+            <span className="font-mono text-ink flex-1">{resetPwdResult?.tempPassword}</span>
+            <button onClick={() => { navigator.clipboard.writeText(resetPwdResult?.tempPassword ?? ''); toast.success('Copied'); }} className="p-1.5 text-muted hover:text-ink transition-colors" title="Copy"><Copy className="w-4 h-4" /></button>
+          </div>
+          <Button className="w-full" onClick={() => setResetPwdResult(null)}>Done</Button>
+        </div>
+      </Modal>
 
       {/* DELETE CONFIRM MODAL */}
       <Modal isOpen={!!deleteConfirmId} onClose={() => setDeleteConfirmId(null)} title="Delete User">

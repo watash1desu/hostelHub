@@ -8,6 +8,7 @@ import {
   reactivateUser,
   deleteUser,
   updateUser,
+  resetPassword,
 } from '../controllers/adminUser.controller';
 import { verifyToken } from '../middlewares/verifyToken.middleware';
 import { requireRole } from '../middlewares/requireRole.middleware';
@@ -40,6 +41,9 @@ router.patch('/:userId/deactivate', deactivateUser);
 
 // Reactivate user
 router.patch('/:userId/reactivate', reactivateUser);
+
+// Reset password
+router.patch('/:userId/reset-password', resetPassword);
 
 // Delete user
 router.delete('/:userId', deleteUser);

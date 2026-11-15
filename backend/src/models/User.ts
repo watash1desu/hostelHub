@@ -18,6 +18,7 @@ const userSchema = new mongoose.Schema(
     },
     roomNo: { type: String },
     isActive: { type: Boolean, default: true },
+    mustChangePassword: { type: Boolean, default: false },
   },
   { timestamps: true }
 );

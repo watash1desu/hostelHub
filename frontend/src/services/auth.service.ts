@@ -93,6 +93,7 @@ export interface UserData {
   isPrimaryAdmin?: boolean;
   roleTitle?: string;
   permissions?: string[];
+  mustChangePassword?: boolean;
 }
 
 export interface LoginResponse {

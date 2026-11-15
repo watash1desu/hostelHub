@@ -21,7 +21,8 @@ export const getMe = async (req: Request, res: Response) => {
       roomNo: dbUser.roomNo ?? null,
       isPrimaryAdmin: dbUser.isPrimaryAdmin,
       roleTitle: dbUser.roleTitle ?? null,
-      permissions: dbUser.permissions
+      permissions: dbUser.permissions,
+      mustChangePassword: dbUser.mustChangePassword ?? false,
     });
 };
 
@@ -66,6 +67,7 @@ export const updateProfile = async (req: Request, res: Response): Promise<void> 
         return;
       }
       dbUser.passwordHash = await bcrypt.hash(password, 10);
+      dbUser.mustChangePassword = false;
     }
 
     await dbUser.save();
