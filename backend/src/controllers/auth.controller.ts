@@ -212,7 +212,8 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       userId: user._id.toString(),
       username: user.username,
       role: user.role,
-      hostelId: user.hostelId.toString()
+      hostelId: user.hostelId.toString(),
+      mustChangePassword: user.mustChangePassword ?? false
     });
     const refreshToken = await generateRefreshToken(user._id.toString());
 
@@ -282,4 +283,3 @@ export const logout = async (req: Request, res: Response): Promise<void> => {
     }
     res.json({ message: 'Logged out successfully' });
 };
-
