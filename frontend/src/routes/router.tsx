@@ -23,6 +23,7 @@ import AppLayout from '../components/common/AppLayout'
 const Login = lazy(() => import('../pages/Login'))
 const Home = lazy(() => import('../pages/Home'))
 const AdminRegister = lazy(() => import('../pages/admin/AdminRegister'))
+const StudentRegister = lazy(() => import('../pages/student/StudentRegister'))
 const SetNewPassword = lazy(() => import('../pages/SetNewPassword'))
 
 const AdminDashboard = lazy(() => import('../pages/admin/AdminDashboard'))
@@ -105,6 +106,7 @@ export default function AppRoutes() {
             <Route path="/" element={<PublicOnlyRoute><Home /></PublicOnlyRoute>} />
             <Route path="/login" element={<PublicOnlyRoute><Login /></PublicOnlyRoute>} />
             <Route path="/admin/register" element={<PublicOnlyRoute><AdminRegister /></PublicOnlyRoute>} />
+            <Route path="/student/register" element={<PublicOnlyRoute><StudentRegister /></PublicOnlyRoute>} />
             <Route path="/set-password" element={<ProtectedRoute><SetNewPassword /></ProtectedRoute>} />
           </Route>
 

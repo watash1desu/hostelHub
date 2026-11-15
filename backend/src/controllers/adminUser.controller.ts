@@ -9,6 +9,7 @@ import { Issue } from '../models/Issue';
 import { RefreshToken } from '../models/RefreshToken';
 import { Dish } from '../models/Dish';
 import { asyncHandler } from '../utils/asyncHandler';
+import { generateStudentUsername } from '../utils/userUtils';
 
 // Generate a random 12-char hex password
 const generatePassword = (): string => crypto.randomBytes(6).toString('hex');
@@ -44,9 +45,7 @@ export const createUser = async (req: Request, res: Response) => {
       }
     } else {
       if (role === 'STUDENT') {
-         const existingInRoom = await User.countDocuments({ hostelId: hostel._id, roomNo });
-         const nextId = existingInRoom + 1;
-         username = `${roomNo}.${nextId}@${hostel.domain}`;
+         username = await generateStudentUsername(hostel._id, hostel.domain, roomNo);
       } else if (role === 'ADMIN') {
          const existingAdmins = await User.countDocuments({ hostelId: hostel._id, role: 'ADMIN' });
          const nextId = existingAdmins + 1;
@@ -151,9 +150,7 @@ export const bulkCreateUsers = async (req: Request, res: Response) => {
       }
       seenRooms.add(normalRoom);
 
-      const existingInRoom = await User.countDocuments({ hostelId: hostel._id, roomNo: normalRoom });
-      const nextId = existingInRoom + 1;
-      const username = `${normalRoom}.${nextId}@${hostel.domain}`;
+      const username = await generateStudentUsername(hostel._id, hostel.domain, normalRoom);
 
       const existing = await User.findOne({ username });
       if (existing) {
@@ -200,9 +197,14 @@ export const getUsers = async (req: Request, res: Response) => {
     }
 
     const query: any = { hostelId: admin.hostelId };
-    if (role) query.role = role;
-    if (status === 'inactive') query.isActive = false;
-    else if (status === 'active') query.isActive = true;
+    if (status === 'pending' || status === 'PENDING') {
+      query.status = 'PENDING';
+    } else {
+      query.status = { $ne: 'PENDING' };
+      if (role) query.role = role;
+      if (status === 'inactive') query.isActive = false;
+      else if (status === 'active') query.isActive = true;
+    }
 
     const hostel = await Hostel.findById(admin.hostelId);
     if (!hostel) return res.status(500).json({ message: 'Hostel not found' });
@@ -373,5 +375,53 @@ export const updateUser = asyncHandler(async (req: Request, res: Response) => {
 
     await userToUpdate.save();
     return res.status(200).json({ user: userToUpdate });
+});
+
+// Approve pending student (primary admin only)
+export const approveUser = asyncHandler(async (req: Request, res: Response) => {
+    const adminId = (req as any).user?._id;
+    const { userId } = req.params;
+
+    const admin = await User.findById(adminId);
+    if (!admin || !admin.isPrimaryAdmin) return res.status(403).json({ message: 'Primary admin only' });
+
+    const target = await User.findOne({ _id: userId, hostelId: admin.hostelId });
+    if (!target) return res.status(404).json({ message: 'User not found' });
+
+    target.status = 'ACTIVE';
+    await target.save();
+
+    await ActivityLog.create({
+      hostelId: admin.hostelId,
+      userId: adminId,
+      action: `Approved student - ${target.name || target.username} (${target.username})`,
+    });
+
+    return res.status(200).json({ message: 'Student approved successfully', user: target });
+});
+
+// Reject pending student (primary admin only)
+export const rejectUser = asyncHandler(async (req: Request, res: Response) => {
+    const adminId = (req as any).user?._id;
+    const { userId } = req.params;
+
+    const admin = await User.findById(adminId);
+    if (!admin || !admin.isPrimaryAdmin) return res.status(403).json({ message: 'Primary admin only' });
+
+    const target = await User.findOne({ _id: userId, hostelId: admin.hostelId });
+    if (!target) return res.status(404).json({ message: 'User not found' });
+
+    const name = target.name || target.username;
+    const username = target.username;
+
+    await User.deleteOne({ _id: userId });
+
+    await ActivityLog.create({
+      hostelId: admin.hostelId,
+      userId: adminId,
+      action: `Rejected student - ${name} (${username})`,
+    });
+
+    return res.status(200).json({ message: 'Student rejected successfully' });
 });
 

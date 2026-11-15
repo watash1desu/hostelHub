@@ -6,6 +6,7 @@ import crypto from 'crypto';
 import { User } from '../models/User';
 import { Hostel } from '../models/Hostel';
 import { generateAccessToken, generateRefreshToken, verifyRefreshToken, refreshAccessToken, revokeRefreshToken } from '../utils/jwt';
+import { generateJoinCode, generateStudentUsername } from '../utils/userUtils';
 
 // ADMIN REGISTRATION
 export const registerAdmin = async (req: Request, res: Response): Promise<void> => {
@@ -66,7 +67,7 @@ export const registerAdmin = async (req: Request, res: Response): Promise<void> 
       { mealName: 'Dinner', offDays: [], categories: [{ categoryName: 'Main Course' }, { categoryName: 'Lentils' }, { categoryName: 'Rice' }, { categoryName: 'Sides' }, { categoryName: 'Dessert' }, { categoryName: 'Bread' }] }
     ];
 
-    const hostel = new Hostel({ name: hostelName, domain, mealPlan: finalMealPlan });
+    const hostel = new Hostel({ name: hostelName, domain, mealPlan: finalMealPlan, joinCode: generateJoinCode() });
     await hostel.save({ session });
 
     const passwordHash = await bcrypt.hash(adminPassword, 10);
@@ -109,6 +110,73 @@ export const registerAdmin = async (req: Request, res: Response): Promise<void> 
   }
 };
 
+// STUDENT REGISTRATION VIA JOIN CODE
+export const registerStudent = async (req: Request, res: Response): Promise<void> => {
+  const { joinCode, name, roomNo, email, password } = req.body;
+
+  if (!joinCode?.trim()) {
+    res.status(400).json({ message: 'Join code is required', field: 'joinCode' });
+    return;
+  }
+  if (!name?.trim()) {
+    res.status(400).json({ message: 'Name is required', field: 'name' });
+    return;
+  }
+  if (!roomNo?.trim()) {
+    res.status(400).json({ message: 'Room number is required', field: 'roomNo' });
+    return;
+  }
+  if (!email?.trim()) {
+    res.status(400).json({ message: 'Email is required', field: 'email' });
+    return;
+  }
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email.trim())) {
+    res.status(400).json({ message: 'Invalid email address', field: 'email' });
+    return;
+  }
+  if (!password || password.length < 8) {
+    res.status(400).json({ message: 'Password must be at least 8 characters long', field: 'password' });
+    return;
+  }
+
+  const hostel = await Hostel.findOne({ joinCode: joinCode.trim().toUpperCase() });
+  if (!hostel) {
+    res.status(400).json({ message: 'Invalid join code', field: 'joinCode' });
+    return;
+  }
+
+  const existingEmail = await User.findOne({ email: email.trim().toLowerCase() });
+  if (existingEmail) {
+    res.status(409).json({ message: 'Email is already in use by another account', field: 'email' });
+    return;
+  }
+
+  const username = await generateStudentUsername(hostel._id, hostel.domain, roomNo.trim());
+  const passwordHash = await bcrypt.hash(password, 10);
+
+  const student = new User({
+    hostelId: hostel._id,
+    name: name.trim(),
+    roomNo: roomNo.trim(),
+    email: email.trim().toLowerCase(),
+    username,
+    passwordHash,
+    role: 'STUDENT',
+    status: 'PENDING',
+    isActive: true,
+    mustChangePassword: false,
+  });
+
+  await student.save();
+
+  res.status(201).json({
+    message: 'Registration submitted for approval',
+    username: student.username,
+    status: student.status
+  });
+};
+
 // UNIFIED LOGIN (Email & Password)
 export const login = async (req: Request, res: Response): Promise<void> => {
     const { username, password } = req.body;
@@ -126,6 +194,11 @@ export const login = async (req: Request, res: Response): Promise<void> => {
 
     if (user.isActive === false) {
       res.status(403).json({ message: 'Your account has been deactivated. Please contact your admin.' });
+      return;
+    }
+
+    if (user.status === 'PENDING') {
+      res.status(403).json({ message: 'Your account is pending approval by the hostel administrator.' });
       return;
     }
 

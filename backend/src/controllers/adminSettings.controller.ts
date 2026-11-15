@@ -4,19 +4,26 @@ import { Dish } from '../models/Dish';
 import { ActivityLog } from '../models/ActivityLog';
 import { parseMenuConstraints } from '../services/menuConstraintParser.service';
 import { validateConstraints } from '../services/menuConstraintValidator.service';
+import { generateJoinCode } from '../utils/userUtils';
 
 export const getSettings = async (req: Request, res: Response) => {
     const hostelId = req.user!.hostelId;
-    const hostel = await Hostel.findById(hostelId).select('mealPlan menuConstraints menuConstraintsText defaultPassword menuChangePolicy');
+    const hostel = await Hostel.findById(hostelId).select('mealPlan menuConstraints menuConstraintsText defaultPassword menuChangePolicy joinCode');
     
     if (!hostel) return res.status(404).json({ message: 'Hostel not found' });
+
+    if (!hostel.joinCode) {
+      hostel.joinCode = generateJoinCode();
+      await hostel.save();
+    }
 
     return res.status(200).json({
       mealPlan: hostel.mealPlan,
       menuConstraints: hostel.menuConstraints || [],
       menuConstraintsText: hostel.menuConstraintsText || '',
       defaultPassword: hostel.defaultPassword || '',
-      menuChangePolicy: hostel.menuChangePolicy || { minVotersPercent: 60, minVoters: 10, cooldownDays: 14 }
+      menuChangePolicy: hostel.menuChangePolicy || { minVotersPercent: 60, minVoters: 10, cooldownDays: 14 },
+      joinCode: hostel.joinCode
     });
 };
 
@@ -141,4 +148,26 @@ export const confirmMenuConstraints = async (req: Request, res: Response) => {
 
 export const deleteHostel = async (req: Request, res: Response) => {
     return res.status(200).json({ message: 'Hostel deleted' });
+};
+
+export const regenerateJoinCode = async (req: Request, res: Response) => {
+    const hostelId = req.user!.hostelId;
+    const hostel = await Hostel.findById(hostelId);
+    if (!hostel) return res.status(404).json({ message: 'Hostel not found' });
+
+    let newCode = generateJoinCode();
+    while (await Hostel.findOne({ joinCode: newCode, _id: { $ne: hostel._id } })) {
+      newCode = generateJoinCode();
+    }
+
+    hostel.joinCode = newCode;
+    await hostel.save();
+
+    await ActivityLog.create({
+      hostelId,
+      userId: req.user!._id,
+      action: `Regenerated join code: ${newCode}`,
+    });
+
+    return res.status(200).json({ joinCode: newCode });
 };

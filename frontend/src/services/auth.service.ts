@@ -73,6 +73,26 @@ export interface AdminRegisterRequest {
   mealPlan?: any[];
 }
 
+export interface StudentRegisterRequest {
+  joinCode: string;
+  name: string;
+  roomNo: string;
+  email: string;
+  password: string;
+}
+
+export interface StudentRegisterResponse {
+  message: string;
+  user: {
+    id: string;
+    name: string;
+    username: string;
+    roomNo: string;
+    email: string;
+    status: string;
+  };
+}
+
 export interface LoginRequest {
   username: string;
   password: string;
@@ -131,6 +151,22 @@ class AuthService {
     const result = await response.json();
     this.setTokens({ accessToken: result.accessToken, refreshToken: result.refreshToken });
     return result;
+  }
+
+  // STUDENT REGISTRATION
+  async registerStudent(data: StudentRegisterRequest): Promise<StudentRegisterResponse> {
+    const response = await fetch(`${API_URL}/student/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || error.error || 'Registration failed');
+    }
+
+    return await response.json();
   }
 
   // UNIFIED LOGIN

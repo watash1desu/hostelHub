@@ -201,6 +201,35 @@ export default function AdminSettings() {
           {activeSection === 'general' && (
             <section id="general" className="space-y-6">
               <Card className="p-6 shadow-none border-hairline">
+                <h2 className="text-card-title text-ink mb-1">Student Join Code</h2>
+                <div className="w-full">
+                  <p className="text-body-xs text-muted mb-4">
+                    Share this 6-character code with students to allow them to register an account for your hostel.
+                  </p>
+                  <div className="flex items-center gap-4 max-w-md">
+                    <span className="font-mono text-xl tracking-wider px-3 py-1.5 bg-surface-soft border border-hairline rounded font-bold text-ink">
+                      {settings.joinCode || '------'}
+                    </span>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      onClick={async () => {
+                        try {
+                          const res = await request('/admin/settings/regenerate-join-code', 'POST', {})
+                          setSettings({ ...settings, joinCode: res.joinCode })
+                          toast.success('Join code regenerated!')
+                        } catch (err: any) {
+                          toast.error(err.message || 'Failed to regenerate join code')
+                        }
+                      }}
+                    >
+                      Regenerate
+                    </Button>
+                  </div>
+                </div>
+              </Card>
+
+              <Card className="p-6 shadow-none border-hairline">
                 <h2 className="text-card-title text-ink mb-1">Default User Password</h2>
                 <div className="w-full">
                   <p className="text-body-xs text-muted mb-4">

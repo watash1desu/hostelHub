@@ -2,6 +2,7 @@ import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
 import {
   registerAdmin,
+  registerStudent,
   login,
   refresh,
   logout,
@@ -19,9 +20,18 @@ const availabilityLimiter = rateLimit({
   message: { message: 'Too many requests, please try again later.' }
 });
 
+const studentRegisterLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: 'Too many registration attempts, please try again later.' }
+});
+
 // Public routes
 router.get('/hostel-available', availabilityLimiter, checkHostelAvailable);
 router.post('/admin/register', registerAdmin);
+router.post('/student/register', studentRegisterLimiter, registerStudent);
 router.post('/login', login);
 router.post('/refresh', refresh);
 

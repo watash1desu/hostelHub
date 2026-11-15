@@ -18,6 +18,7 @@ const userSchema = new mongoose.Schema(
     },
     roomNo: { type: String },
     isActive: { type: Boolean, default: true },
+    status: { type: String, enum: ['ACTIVE', 'PENDING'], default: 'ACTIVE' },
     mustChangePassword: { type: Boolean, default: false },
   },
   { timestamps: true }

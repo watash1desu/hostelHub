@@ -10,7 +10,7 @@ import { Modal } from '../../components/ui/modal'
 import { Badge } from '../../components/ui/badge'
 
 import { Pagination } from '../../components/ui/pagination'
-import { Trash2, Ban, CheckCircle, Pencil, KeyRound, Copy } from 'lucide-react'
+import { Trash2, Ban, CheckCircle, Pencil, KeyRound, Copy, Check, X } from 'lucide-react'
 import { CreateUserModal, CsvImportModal, EditUserModal } from './components/UserModals'
 
 interface User {
@@ -32,7 +32,8 @@ export default function AdminUsers() {
 
   const [users, setUsers] = useState<User[]>([])
   const [loading, setLoading] = useState(false)
-  const [activeTab, setActiveTab] = useState<'STUDENT' | 'ADMIN'>('STUDENT')
+  const [activeTab, setActiveTab] = useState<'STUDENT' | 'ADMIN' | 'PENDING'>('STUDENT')
+  const [pendingUsers, setPendingUsers] = useState<User[]>([])
   
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1)
@@ -52,6 +53,37 @@ export default function AdminUsers() {
     setSortConfig({ key, direction })
   }
 
+  const fetchPendingUsers = async () => {
+    try {
+      const res = await request('/admin/users?status=pending')
+      setPendingUsers(res.users || [])
+    } catch {
+      // ignore
+    }
+  }
+
+  const handleApprove = async (userId: string) => {
+    try {
+      await request(`/admin/users/${userId}/approve`, 'PATCH')
+      toast.success('Student approved')
+      setPendingUsers(prev => prev.filter(u => u._id !== userId))
+      fetchUsers()
+    fetchPendingUsers()
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to approve student')
+    }
+  }
+
+  const handleReject = async (userId: string) => {
+    try {
+      await request(`/admin/users/${userId}/reject`, 'PATCH')
+      toast.success('Student rejected')
+      setPendingUsers(prev => prev.filter(u => u._id !== userId))
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to reject student')
+    }
+  }
+
   const fetchUsers = async () => {
     setLoading(true)
     try {
@@ -65,6 +97,7 @@ export default function AdminUsers() {
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchUsers()
+    fetchPendingUsers()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -160,13 +193,63 @@ export default function AdminUsers() {
         </div>
       </div>
 
-      {loading && <div className="p-8 text-center text-body text-muted">Loading users...</div>}
+      {activeTab === 'PENDING' && (
+        <Card className="overflow-hidden shadow-none border-hairline flex flex-col">
+          {pendingUsers.length === 0 ? (
+            <div className="p-8 text-center text-body text-muted">No pending approvals found.</div>
+          ) : (
+            <div className="overflow-x-auto w-full">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-surface-soft">
+                    <TableHead className="text-center w-[20%]">Name</TableHead>
+                    <TableHead className="text-center w-[20%]">Username</TableHead>
+                    <TableHead className="text-center w-[25%]">Email</TableHead>
+                    <TableHead className="text-center w-[15%]">Room No</TableHead>
+                    <TableHead className="text-center w-[20%]">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {pendingUsers.map(pUser => (
+                    <TableRow key={pUser._id} className="transition-colors hover:bg-surface-soft">
+                      <TableCell className="text-ink text-center">{pUser.name}</TableCell>
+                      <TableCell className="text-muted text-center font-mono">{pUser.username}</TableCell>
+                      <TableCell className="text-muted text-center">{pUser.email || '-'}</TableCell>
+                      <TableCell className="text-muted text-center">{pUser.roomNo ? `Room ${pUser.roomNo}` : '-'}</TableCell>
+                      <TableCell className="text-center">
+                        <div className="flex items-center justify-center gap-2">
+                          <button
+                            onClick={() => handleApprove(pUser._id)}
+                            className="p-1.5 rounded transition-colors text-semantic-success hover:bg-semantic-success/10"
+                            title="Approve Student"
+                          >
+                            <Check className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleReject(pUser._id)}
+                            className="p-1.5 rounded transition-colors text-semantic-error hover:bg-semantic-error/10"
+                            title="Reject Student"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </Card>
+      )}
 
-      {!loading && users.filter(u => u.role === activeTab).length === 0 && (
+      {activeTab !== 'PENDING' && loading && <div className="p-8 text-center text-body text-muted">Loading users...</div>}
+
+      {activeTab !== 'PENDING' && !loading && users.filter(u => u.role === activeTab).length === 0 && (
         <div className="p-8 text-center text-body text-muted">No {activeTab.toLowerCase()}s found.</div>
       )}
 
-      {!loading && users.filter(u => u.role === activeTab).length > 0 && (() => {
+      {activeTab !== 'PENDING' && !loading && users.filter(u => u.role === activeTab).length > 0 && (() => {
         const filteredUsers = users.filter(u => u.role === activeTab)
         
         const sortedUsers = [...filteredUsers].sort((a: any, b: any) => {

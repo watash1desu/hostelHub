@@ -5,6 +5,7 @@ const hostelSchema = new mongoose.Schema(
   {
     name: { type: String, required: true, trim: true },
     domain: { type: String, required: true, unique: true, lowercase: true, trim: true },
+    joinCode: { type: String, unique: true, sparse: true, uppercase: true, trim: true },
     tags: {
       type: [String],
       default: () => [...DEFAULT_HOSTEL_TAGS],

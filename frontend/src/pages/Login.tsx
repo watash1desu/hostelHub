@@ -168,6 +168,17 @@ export default function Login() {
             Register Hostel
           </Button>
         </p>
+
+        <p className="text-center text-body-sm text-muted">
+          Student?{' '}
+          <Button
+            variant="tertiary"
+            onClick={() => navigate('/student/register')}
+            className="p-0 underline hover:text-ink min-h-0"
+          >
+            Join your hostel
+          </Button>
+        </p>
       </div>
     </div>
   )

@@ -9,6 +9,8 @@ import {
   deleteUser,
   updateUser,
   resetPassword,
+  approveUser,
+  rejectUser,
 } from '../controllers/adminUser.controller';
 import { verifyToken } from '../middlewares/verifyToken.middleware';
 import { requireRole } from '../middlewares/requireRole.middleware';
@@ -44,6 +46,10 @@ router.patch('/:userId/reactivate', reactivateUser);
 
 // Reset password
 router.patch('/:userId/reset-password', resetPassword);
+
+// Approve / Reject pending student
+router.patch('/:userId/approve', approveUser);
+router.patch('/:userId/reject', rejectUser);
 
 // Delete user
 router.delete('/:userId', deleteUser);
