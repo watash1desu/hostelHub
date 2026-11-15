@@ -10,7 +10,8 @@
     "dev": "nodemon",
     "build": "tsc",
     "start": "node dist/server.js",
-    "test": "vitest run"
+    "test": "vitest run",
+    "seed": "ts-node -T src/scripts/seed.ts"
   },
   "dependencies": {
     "@google/genai": "^2.22.0",
