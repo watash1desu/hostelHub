@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Eye, EyeOff, AlertCircle, CheckCircle } from 'lucide-react'
 import { authService } from '@/services/auth.service'
+import { APP_NAME } from '@/config/app'
 
 export default function Login() {
   const navigate = useNavigate()
@@ -24,6 +25,8 @@ export default function Login() {
       navigate(`/${user.role.toLowerCase()}/dashboard`, { replace: true })
     }
   }, [isAuthenticated, user, navigate])
+
+  useEffect(() => { document.title = APP_NAME }, [])
 
   // Clear stale errors on mount
   useEffect(() => {

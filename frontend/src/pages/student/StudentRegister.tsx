@@ -1,12 +1,14 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { authService } from '@/services/auth.service'
 import type { StudentRegisterResponse } from '@/services/auth.service'
 import { Eye, EyeOff, CheckCircle } from 'lucide-react'
+import { APP_NAME } from '@/config/app'
 
 export default function StudentRegister() {
+  useEffect(() => { document.title = APP_NAME }, [])
   const navigate = useNavigate()
   const [formData, setFormData] = useState({
     joinCode: '',

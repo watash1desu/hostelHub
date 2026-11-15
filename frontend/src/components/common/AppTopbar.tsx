@@ -5,6 +5,7 @@ import { LogOut, User, Menu, X, Sparkles } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ThemeToggle } from './ThemeToggle'
 import ProfileModal from './ProfileModal'
+import { APP_NAME } from '../../config/app'
 
 interface AdminLink {
   label: string
@@ -143,9 +144,9 @@ export default function AppTopbar() {
           {/* Logo / Brand */}
           <Link to={homeRoute} className="flex items-center gap-2 hover:opacity-90 transition-opacity">
             <div className="w-8 h-8 bg-ink rounded flex items-center justify-center shrink-0">
-              <span className="text-card-title text-canvas leading-none">H</span>
+              <span className="text-card-title text-canvas leading-none">{APP_NAME[0]}</span>
             </div>
-            <span className="text-card-title tracking-tight text-ink hidden sm:inline-block">HostelHub</span>
+            <span className="text-card-title tracking-tight text-ink hidden sm:inline-block">{APP_NAME}</span>
           </Link>
         </div>
 

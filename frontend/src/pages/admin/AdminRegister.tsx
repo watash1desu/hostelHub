@@ -5,6 +5,7 @@ import { useNavigate, Link } from 'react-router-dom'
 import { authService } from '../../services/auth.service'
 import { Eye, EyeOff } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
+import { APP_NAME } from '../../config/app'
 
 const DEFAULT_MEALS = [
   { mealName: 'Breakfast', offDays: [] as number[], categories: [{ categoryName: 'Main Course' }, { categoryName: 'Beverage' }, { categoryName: 'Bread' }, { categoryName: 'Condiment' }] },
@@ -14,6 +15,7 @@ const DEFAULT_MEALS = [
 ];
 
 export default function AdminRegister() {
+  useEffect(() => { document.title = APP_NAME }, [])
   const [formData, setFormData] = useState({
     hostelName: '',
     adminName: '',
