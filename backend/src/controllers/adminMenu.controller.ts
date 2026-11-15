@@ -3,6 +3,8 @@ import { Request, Response } from 'express';
 import { MessMenu } from '../models/MessMenu';
 import { StudentVote } from '../models/StudentVote';
 import { User } from '../models/User';
+import { Hostel } from '../models/Hostel';
+import { evaluateChangeRequest } from '../services/menuChangeRequest.service';
 import * as ComputationService from '../services/menuComputation.service';
 import * as BuilderService from '../services/menuBuilder.service';
 
@@ -19,6 +21,38 @@ export const getVotingStats = async (req: Request, res: Response) => {
       totalVoters,
       totalStudents,
       requestsNewMenu
+    });
+};
+
+/**
+ * ADMIN: GET MENU CHANGE REQUEST STATUS
+ */
+export const getMenuChangeRequest = async (req: Request, res: Response) => {
+    const hostelId = req.user!.hostelId;
+
+    const hostel = await Hostel.findById(hostelId);
+    const policy = hostel?.menuChangePolicy || { minVotersPercent: 60, minVoters: 10, cooldownDays: 14 };
+
+    const totalVoters = await StudentVote.countDocuments({ hostelId });
+    const wantingVoters = await StudentVote.countDocuments({ hostelId, wantsNewMenu: true });
+
+    const lastPublishedMenu = await MessMenu.findOne({ hostelId, status: 'PUBLISHED' })
+      .sort({ publishedAt: -1, updatedAt: -1 });
+    const lastPublishedAt = lastPublishedMenu?.publishedAt || lastPublishedMenu?.updatedAt || null;
+
+    const evaluation = evaluateChangeRequest({
+      totalVoters,
+      wantingVoters,
+      lastPublishedAt,
+      now: new Date(),
+      policy
+    });
+
+    return res.status(200).json({
+      ...evaluation,
+      policy,
+      totalVoters,
+      wantingVoters
     });
 };
 

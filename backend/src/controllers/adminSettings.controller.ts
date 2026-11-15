@@ -7,7 +7,7 @@ import { validateConstraints } from '../services/menuConstraintValidator.service
 
 export const getSettings = async (req: Request, res: Response) => {
     const hostelId = req.user!.hostelId;
-    const hostel = await Hostel.findById(hostelId).select('mealPlan menuConstraints menuConstraintsText defaultPassword');
+    const hostel = await Hostel.findById(hostelId).select('mealPlan menuConstraints menuConstraintsText defaultPassword menuChangePolicy');
     
     if (!hostel) return res.status(404).json({ message: 'Hostel not found' });
 
@@ -15,13 +15,14 @@ export const getSettings = async (req: Request, res: Response) => {
       mealPlan: hostel.mealPlan,
       menuConstraints: hostel.menuConstraints || [],
       menuConstraintsText: hostel.menuConstraintsText || '',
-      defaultPassword: hostel.defaultPassword || ''
+      defaultPassword: hostel.defaultPassword || '',
+      menuChangePolicy: hostel.menuChangePolicy || { minVotersPercent: 60, minVoters: 10, cooldownDays: 14 }
     });
 };
 
 export const updateSettings = async (req: Request, res: Response) => {
     const hostelId = req.user!.hostelId;
-    const { mealPlan, defaultPassword } = req.body;
+    const { mealPlan, defaultPassword, menuChangePolicy } = req.body;
 
     const hostel = await Hostel.findById(hostelId);
     if (!hostel) return res.status(404).json({ message: 'Hostel not found' });
@@ -64,11 +65,20 @@ export const updateSettings = async (req: Request, res: Response) => {
       hostel.defaultPassword = defaultPassword;
     }
 
+    if (menuChangePolicy) {
+      hostel.menuChangePolicy = {
+        minVotersPercent: Number(menuChangePolicy.minVotersPercent) ?? 60,
+        minVoters: Number(menuChangePolicy.minVoters) ?? 10,
+        cooldownDays: Number(menuChangePolicy.cooldownDays) ?? 14
+      };
+    }
+
     await hostel.save();
 
     return res.status(200).json({ 
       message: 'Settings updated successfully',
-      mealPlan: hostel.mealPlan
+      mealPlan: hostel.mealPlan,
+      menuChangePolicy: hostel.menuChangePolicy
     });
 };
 

@@ -34,6 +34,20 @@ export default function AdminMessMenu() {
   const [requestsNewMenu, setRequestsNewMenu] = useState<number>(0)
   const [generating, setGenerating] = useState<boolean>(false)
 
+  // Menu change request state
+  const [changeRequest, setChangeRequest] = useState<{
+    requested: boolean
+    percent: number
+    cooldownEndsAt: string | null
+    reason: string
+  } | null>(null)
+
+  const getCooldownDays = (cooldownEndsAt: string) => {
+    const diff = new Date(cooldownEndsAt).getTime() - Date.now()
+    if (diff <= 0) return 0
+    return Math.ceil(diff / (1000 * 60 * 60 * 24))
+  }
+
   // Reviews stats
   const [trendStats, setTrendStats] = useState<any[]>([])
 
@@ -86,6 +100,11 @@ export default function AdminMessMenu() {
     // Fetch review trend stats
     request('/admin/reviews/stats').then((res: any) => {
       if (res?.trendStats) setTrendStats(res.trendStats)
+    }).catch(() => {})
+
+    // Fetch change request status
+    request('/admin/menu/change-request').then((res: any) => {
+      if (res) setChangeRequest(res)
     }).catch(() => {})
   }, [request])
 
@@ -159,6 +178,7 @@ export default function AdminMessMenu() {
       await request('/admin/menu/generate', 'POST', {})
       toast.success('Menu generated successfully!')
       fetchMenuData() // Refresh menu after generation
+      request('/admin/menu/change-request').then((res: any) => { if (res) setChangeRequest(res) }).catch(() => {})
     } catch (e: unknown) {
       toast.error((e as Error).message || 'Error generating menu')
     } finally {
@@ -417,6 +437,27 @@ export default function AdminMessMenu() {
       </Modal>
 
 
+
+      {/* CHANGE REQUEST BANNER */}
+      {changeRequest?.requested && (
+        <div className="bg-surface-soft border border-hairline p-4 rounded-lg flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
+          <div className="flex items-center gap-2">
+            <span className="text-body text-ink font-medium">
+              {changeRequest.percent}% want a new menu
+              {changeRequest.cooldownEndsAt && getCooldownDays(changeRequest.cooldownEndsAt) > 0
+                ? `, cooldown ends in ${getCooldownDays(changeRequest.cooldownEndsAt)} ${getCooldownDays(changeRequest.cooldownEndsAt) === 1 ? 'day' : 'days'}`
+                : ''}
+            </span>
+          </div>
+          <Button
+            onClick={handleGenerateMenu}
+            disabled={generating || Boolean(changeRequest.cooldownEndsAt && getCooldownDays(changeRequest.cooldownEndsAt) > 0)}
+            className="w-full sm:w-auto"
+          >
+            {generating ? 'Generating...' : 'Generate drafts'}
+          </Button>
+        </div>
+      )}
 
       {/* MENU PREVIEW TABLE */}
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-end gap-4 mb-4 mt-2">

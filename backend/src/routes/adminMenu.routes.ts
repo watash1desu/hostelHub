@@ -4,6 +4,7 @@ import { requireRole } from '../middlewares/requireRole.middleware';
 import { requirePermission } from '../middlewares/requirePermission.middleware';
 import {
   getVotingStats,
+  getMenuChangeRequest,
   generateFinalMenu,
   getMenuPreview,
   publishMenu,
@@ -17,6 +18,7 @@ const router = express.Router();
 router.use(verifyToken, requireRole('ADMIN'));
 
 router.get('/voting/stats', requirePermission('MANAGE_MENU'), getVotingStats);
+router.get('/change-request', requirePermission('MANAGE_MENU'), getMenuChangeRequest);
 router.post('/generate', requirePermission('MANAGE_MENU'), generateFinalMenu);
 router.get('/preview', requirePermission('MANAGE_MENU'), getMenuPreview);
 router.post('/publish', requirePermission('MANAGE_MENU'), publishMenu);

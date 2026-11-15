@@ -216,6 +216,63 @@ export default function AdminSettings() {
                   </div>
                 </div>
               </Card>
+
+              <Card className="p-6 shadow-none border-hairline">
+                <h2 className="text-card-title text-ink mb-1">Menu Change Request Policy</h2>
+                <div className="w-full">
+                  <p className="text-body-xs text-muted mb-4">
+                    Configure the threshold and cooldown period required for students to trigger a menu change request.
+                  </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-2xl">
+                    <div>
+                      <label className="block text-body-sm mb-1 text-ink">Minimum Voters (%)</label>
+                      <Input
+                        type="number"
+                        min={1}
+                        max={100}
+                        value={settings.menuChangePolicy?.minVotersPercent ?? 60}
+                        onChange={(e: any) => setSettings({
+                          ...settings,
+                          menuChangePolicy: {
+                            ...(settings.menuChangePolicy || {}),
+                            minVotersPercent: Number(e.target.value)
+                          }
+                        })}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-body-sm mb-1 text-ink">Minimum Voters (Count)</label>
+                      <Input
+                        type="number"
+                        min={1}
+                        value={settings.menuChangePolicy?.minVoters ?? 10}
+                        onChange={(e: any) => setSettings({
+                          ...settings,
+                          menuChangePolicy: {
+                            ...(settings.menuChangePolicy || {}),
+                            minVoters: Number(e.target.value)
+                          }
+                        })}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-body-sm mb-1 text-ink">Cooldown (Days)</label>
+                      <Input
+                        type="number"
+                        min={0}
+                        value={settings.menuChangePolicy?.cooldownDays ?? 14}
+                        onChange={(e: any) => setSettings({
+                          ...settings,
+                          menuChangePolicy: {
+                            ...(settings.menuChangePolicy || {}),
+                            cooldownDays: Number(e.target.value)
+                          }
+                        })}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </Card>
             </section>
           )}
 

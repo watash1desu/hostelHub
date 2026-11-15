@@ -19,6 +19,11 @@ const hostelSchema = new mongoose.Schema(
       }]
     }],
     defaultPassword: { type: String, default: "" },
+    menuChangePolicy: {
+      minVotersPercent: { type: Number, default: 60 },
+      minVoters: { type: Number, default: 10 },
+      cooldownDays: { type: Number, default: 14 }
+    },
     menuConstraintsText: { type: String, default: '' },
     menuConstraints: [{
       action: {

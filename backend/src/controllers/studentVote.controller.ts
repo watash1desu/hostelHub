@@ -109,19 +109,6 @@ export const saveStudentVotes = async (req: Request, res: Response) => {
       { upsert: true, returnDocument: 'after', runValidators: true }
     );
 
-    // 5. Check if we should trigger auto-generation
-    const totalVoters = await StudentVote.countDocuments({ hostelId });
-    const votersWantingNewMenu = await StudentVote.countDocuments({ hostelId, wantsNewMenu: true });
-    
-    if (totalVoters > 0 && (votersWantingNewMenu / totalVoters) >= 0.5) {
-      const ComputationService = require('../services/menuComputation.service');
-      const BuilderService = require('../services/menuBuilder.service');
-      
-      await ComputationService.computeMenuRecommendations(hostelId.toString());
-      await BuilderService.buildMessMenu(hostelId.toString(), true, 'AUTO');
-      await StudentVote.updateMany({ hostelId }, { wantsNewMenu: false });
-    }
-
     return res.status(200).json({
       message: 'Preferences saved successfully',
       votes: updatedVotes
