@@ -3,7 +3,7 @@ import { Request, Response } from 'express';
 import { login, registerAdmin, checkHostelAvailable } from '../controllers/auth.controller';
 import { User } from '../models/User';
 import { Hostel } from '../models/Hostel';
-import { generateRefreshToken } from '../utils/jwt';
+import { generateRefreshToken, generateAccessToken } from '../utils/jwt';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 
@@ -96,6 +96,30 @@ describe('Auth Controller - login', () => {
       message: 'Login successful',
       accessToken: 'mocked-token',
       user: expect.objectContaining({ username: 'testuser' })
+    }));
+  });
+
+  it('should call generateAccessToken with mustChangePassword: true when user with that flag logs in', async () => {
+    req.body = { username: 'testuser', password: 'password123' };
+    const mockUser = {
+      _id: '64f1a2b3c4d5e6f7a8b9c0d2',
+      username: 'testuser',
+      password: 'hashedpassword',
+      isActive: true,
+      role: 'STUDENT',
+      name: 'Test User',
+      hostelId: '64f1a2b3c4d5e6f7a8b9c0d1',
+      mustChangePassword: true
+    };
+
+    vi.mocked(User.findOne).mockResolvedValue(mockUser as any);
+    vi.mocked(bcrypt.compare).mockResolvedValue(true as never);
+    vi.mocked(generateRefreshToken).mockResolvedValue('mocked-refresh-token');
+
+    await login(req as Request, res as Response);
+
+    expect(generateAccessToken).toHaveBeenCalledWith(expect.objectContaining({
+      mustChangePassword: true
     }));
   });
 });
