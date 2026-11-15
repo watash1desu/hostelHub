@@ -85,6 +85,24 @@ describe('Unknown-tag Warning in Rule Preview', () => {
     expect(valid).toBe(true);
     expect(warnings).toHaveLength(0);
   });
+
+  it('should validate PREFER rules requiring weight (-50 to 50)', () => {
+    // Missing weight
+    const invalidRule1 = [{ action: 'PREFER', appliesTo: { tag: 'paneer' }, sourcePhrase: 'Prefer paneer' }];
+    const res1 = validateConstraints(invalidRule1, new Set(), { paneer: 1 });
+    expect(res1.valid).toBe(false);
+    expect(res1.errors[0]).toContain("is a PREFER rule but has an invalid or missing 'weight'");
+
+    // Out of range weight
+    const invalidRule2 = [{ action: 'PREFER', appliesTo: { tag: 'paneer' }, weight: 100, sourcePhrase: 'Prefer paneer' }];
+    const res2 = validateConstraints(invalidRule2, new Set(), { paneer: 1 });
+    expect(res2.valid).toBe(false);
+
+    // Valid weight
+    const validRule = [{ action: 'PREFER', appliesTo: { tag: 'paneer' }, weight: 25, sourcePhrase: 'Prefer paneer' }];
+    const res3 = validateConstraints(validRule, new Set(), { paneer: 1 });
+    expect(res3.valid).toBe(true);
+  });
 });
 
 describe('Dish update addToSet behavior', () => {

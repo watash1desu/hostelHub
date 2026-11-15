@@ -29,7 +29,7 @@ const hostelSchema = new mongoose.Schema(
     menuConstraints: [{
       action: {
         type: String,
-        enum: ['ALLOW_IF', 'REQUIRE_IF', 'LIMIT'],
+        enum: ['ALLOW_IF', 'REQUIRE_IF', 'LIMIT', 'PREFER'],
         required: true,
       },
       appliesTo: {
@@ -41,6 +41,7 @@ const hostelSchema = new mongoose.Schema(
       condition: { type: mongoose.Schema.Types.Mixed, required: true },
       max: { type: Number },
       windowSize: { type: Number },
+      weight: { type: Number },
       sourcePhrase: { type: String, required: true },
     }],
     menuConstraintsUpdatedAt: { type: Date }

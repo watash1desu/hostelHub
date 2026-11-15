@@ -9,11 +9,12 @@ import solver from 'javascript-lp-solver';
 import jsonLogic from 'json-logic-js';
 
 interface Rule {
-  action: 'ALLOW_IF' | 'REQUIRE_IF' | 'LIMIT';
+  action: 'ALLOW_IF' | 'REQUIRE_IF' | 'LIMIT' | 'PREFER';
   appliesTo: { mealType?: string; categoryName?: string; dishId?: string; tag?: string };
   condition: object;
   max?: number;
   windowSize?: number;
+  weight?: number;
   sourcePhrase: string;
 }
 
@@ -148,8 +149,19 @@ export function solveMealAssignment(
       // Scale finalScore (0-1) up to heavily prioritize student votes (0-200)
       const scaledFinalScore = c.finalScore * 200;
 
+      let preferBonus = 0;
+      for (const rule of rules) {
+        if (rule.action === 'PREFER' && ruleApplies(rule, ctx)) {
+          try {
+            if ((rule.condition as any) === true || jsonLogic.apply(rule.condition, ctx)) {
+              preferBonus += (rule.weight || 0);
+            }
+          } catch (e) {}
+        }
+      }
+
       model.variables[varKey] = {
-        score: scaledFinalScore - historyPenalty,
+        score: scaledFinalScore - historyPenalty + preferBonus,
         [slotConstraintKey]: 1,
       };
       model.ints[varKey] = 1;

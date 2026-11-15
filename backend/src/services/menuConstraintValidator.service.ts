@@ -23,6 +23,14 @@ export function validateConstraints(
       errors.push(`Rule "${r.sourcePhrase}" is a LIMIT rule but has an invalid or missing 'max' value.`);
     }
 
+    if (r.action === 'PREFER') {
+      if (typeof r.weight !== 'number' || r.weight < -50 || r.weight > 50) {
+        errors.push(`Rule "${r.sourcePhrase}" is a PREFER rule but has an invalid or missing 'weight' value (-50 to 50).`);
+      }
+    } else if (r.weight !== undefined && (typeof r.weight !== 'number' || r.weight < -50 || r.weight > 50)) {
+      errors.push(`Rule "${r.sourcePhrase}" has an invalid 'weight' value (-50 to 50).`);
+    }
+
     if (r.appliesTo?.tag) {
       const tagLower = String(r.appliesTo.tag).trim().toLowerCase();
       const count = dishTagCounts[tagLower] || 0;

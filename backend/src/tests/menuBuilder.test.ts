@@ -156,4 +156,65 @@ describe('Menu Builder MILP Solver', () => {
     expect(maxCount).toBeLessThan(7);
     expect(maxCount).toBeLessThanOrEqual(3);
   });
+  it('should nudge close scores with a soft PREFER rule', () => {
+    // candidate A has base finalScore 4.0 (scaled = 800)
+    // candidate B has base finalScore 3.9 (scaled = 780)
+    const candidates = [
+      { dishId: 'dish_a', finalScore: 4.0, tags: ['veg'], name: 'Dish A', _id: 'd1' },
+      { dishId: 'dish_b', finalScore: 3.9, tags: ['paneer'], name: 'Dish B', _id: 'd2' },
+    ];
+    const historyMap = new Map();
+
+    // Baseline: Dish A wins (800 > 780)
+    const baseline = solveMealAssignment(candidates, [0], mealType, [], historyMap, 'Standard');
+    expect(baseline.get(0)).toBe('dish_a');
+
+    // With PREFER on Dish B (+30 weight): Dish B reaches 780 + 30 = 810 > 800
+    const rules: any = [
+      {
+        action: 'PREFER',
+        appliesTo: { dishId: 'dish_b' },
+        weight: 30,
+        condition: { '==': [1, 1] },
+        sourcePhrase: 'Prefer Dish B'
+      }
+    ];
+    const preferred = solveMealAssignment(candidates, [0], mealType, rules, historyMap, 'Standard');
+    expect(preferred.get(0)).toBe('dish_b');
+  });
+
+  it('cannot override a hard LIMIT rule even with strong PREFER', () => {
+    const candidates = [
+      { dishId: 'dish_chicken', finalScore: 4.5, tags: ['chicken'], name: 'Chicken Curry', _id: 'd1' },
+      { dishId: 'dish_paneer', finalScore: 3.5, tags: ['paneer', 'veg'], name: 'Paneer Butter Masala', _id: 'd2' },
+      { dishId: 'dish_dal', finalScore: 3.0, tags: ['dal', 'veg'], name: 'Dal Tadka', _id: 'd3' },
+    ];
+    const historyMap = new Map();
+
+    const rules: any = [
+      {
+        action: 'LIMIT',
+        appliesTo: { tag: 'chicken' },
+        max: 1,
+        sourcePhrase: 'Limit chicken to 1 per week'
+      },
+      {
+        action: 'PREFER',
+        appliesTo: { tag: 'chicken' },
+        weight: 50,
+        condition: { '==': [1, 1] },
+        sourcePhrase: 'Strongly prefer chicken'
+      }
+    ];
+
+    const assignment = solveMealAssignment(candidates, [0, 1, 2, 3, 4, 5, 6], mealType, rules, historyMap, 'Standard');
+    expect(assignment.size).toBe(7);
+
+    let chickenCount = 0;
+    for (const dishId of assignment.values()) {
+      if (dishId === 'dish_chicken') chickenCount++;
+    }
+    // Hard LIMIT strictly holds despite +50 PREFER
+    expect(chickenCount).toBe(1);
+  });
 });

@@ -10,7 +10,7 @@ const RULE_SCHEMA = {
       items: {
         type: 'object',
         properties: {
-          action: { type: 'string', enum: ['ALLOW_IF', 'REQUIRE_IF', 'LIMIT'] },
+          action: { type: 'string', enum: ['ALLOW_IF', 'REQUIRE_IF', 'LIMIT', 'PREFER'] },
           appliesTo: {
             type: 'object',
             properties: {
@@ -26,6 +26,7 @@ const RULE_SCHEMA = {
           },
           max: { type: 'integer' },
           windowSize: { type: 'integer' },
+          weight: { type: 'integer' },
           sourcePhrase: { type: 'string' },
         },
         required: ['action', 'appliesTo', 'condition', 'sourcePhrase'],
@@ -42,6 +43,7 @@ Each rule has exactly one action:
 - ALLOW_IF: the dish/tag may only be placed when the condition is true. DO NOT use ALLOW_IF for spacing/gap rules.
 - REQUIRE_IF: the dish/tag must be placed when the condition is true
 - LIMIT: caps how many times a tag may appear. Use "max" to set the limit. If it's a spacing/gap rule within the week (e.g. "alternate days", "at least 3 days between", "no continuous", "max 2 per week"), you MUST use LIMIT with "max" and "windowSize". For example, "alternate days" = windowSize: 2, max: 1.
+- PREFER: soft preference that nudges candidate score by weight (-50 to 50, required for PREFER). Show as "soft" in the preview.
 
 
 Conditions are JsonLogic expressions using only these variables via {"var": "..."}:

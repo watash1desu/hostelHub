@@ -178,6 +178,12 @@ export default function AdminMenuRules() {
           <div className="mt-6 p-5 bg-surface-soft/50 border border-hairline rounded-lg">
             <h3 className="text-body font-medium text-ink mb-2">AI Interpretation</h3>
             <p className="text-body-sm text-muted italic whitespace-pre-line">{previewText}</p>
+            {parsedConstraints.some((c: any) => c.action === 'PREFER') && (
+              <div className="mt-2 flex items-center gap-1.5 text-caption text-muted">
+                <span className="inline-block px-1.5 py-0.5 rounded text-[10px] uppercase font-semibold bg-surface-soft border border-hairline">soft</span>
+                <span>Includes soft preference rules</span>
+              </div>
+            )}
 
             {previewErrors.length > 0 && (
               <div className="mt-4 p-3 bg-(--color-semantic-error)/10 border border-(--color-semantic-error)/20 rounded-md">
@@ -211,6 +217,9 @@ export default function AdminMenuRules() {
                 <div key={i} className="p-3 bg-canvas border border-hairline rounded flex items-start gap-2">
                   <div className="w-1.5 h-1.5 rounded-full bg-(--color-primary) mt-1.5 shrink-0" />
                   <span className="text-body-sm text-ink">{c.sourcePhrase}</span>
+                  {c.action === 'PREFER' && (
+                    <span className="text-[10px] uppercase font-semibold text-muted bg-surface-soft px-1.5 py-0.5 rounded ml-auto">soft</span>
+                  )}
                 </div>
               ))}
             </div>
