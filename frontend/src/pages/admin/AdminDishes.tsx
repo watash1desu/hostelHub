@@ -169,29 +169,42 @@ export default function AdminDishManagement() {
   const handleDeactivate = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!deactivateConfirmId) return
+    const dishId = deactivateConfirmId
+    const note = deactivateReason
+    const prevDishes = [...dishes]
+
+    // Optimistic update
+    setDishes(prev => prev.map(d => d._id === dishId ? { ...d, status: 'INACTIVE' } : d))
+    setDeactivateConfirmId(null)
+    setDeactivateReason('')
+
     try {
-      await request(`/admin/dishes/${deactivateConfirmId}/toggle-status`, 'PATCH', { status: 'INACTIVE', note: deactivateReason })
+      await request(`/admin/dishes/${dishId}/toggle-status`, 'PATCH', { status: 'INACTIVE', note })
       toast.success('Dish deactivated successfully!')
       loadDishes()
     } catch (err: unknown) {
+      setDishes(prevDishes)
       toast.error((err as Error).message || 'Failed to deactivate dish')
-    } finally {
-      setDeactivateConfirmId(null)
-      setDeactivateReason('')
     }
   }
 
   const handleApprove = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!approveConfirmId) return
+    const dishId = approveConfirmId
+    const prevDishes = [...dishes]
+
+    // Optimistic update
+    setDishes(prev => prev.filter(d => d._id !== dishId))
+    setApproveConfirmId(null)
+
     try {
-      await request(`/admin/dishes/${approveConfirmId}/approve`, 'POST', approveScores)
+      await request(`/admin/dishes/${dishId}/approve`, 'POST', approveScores)
       toast.success('Dish approved successfully!')
       loadDishes()
     } catch (err: unknown) {
+      setDishes(prevDishes)
       toast.error((err as Error).message || 'Failed to approve dish')
-    } finally {
-      setApproveConfirmId(null)
     }
   }
 
@@ -211,11 +224,17 @@ export default function AdminDishManagement() {
   }
 
   const handleToggleStatus = async (id: string, status: string) => {
+    const prevDishes = [...dishes]
+
+    // Optimistic update
+    setDishes(prev => prev.map(d => d._id === id ? { ...d, status } : d))
+
     try {
       await request(`/admin/dishes/${id}/toggle-status`, 'PATCH', { status })
       toast.success('Dish status updated!')
       loadDishes()
     } catch (err: unknown) {
+      setDishes(prevDishes)
       toast.error((err as Error).message || 'Failed to update status')
     }
   }

@@ -1,3 +1,5 @@
+import { clearApiCache } from '../hooks/useApi';
+
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
 const API_URL = `${API_BASE_URL}/auth`;
 
@@ -257,6 +259,7 @@ class AuthService {
 
   // TOKEN MANAGEMENT
   setTokens(tokens: TokenResponse): void {
+    clearApiCache();
     localStorage.setItem('accessToken', tokens.accessToken);
     localStorage.setItem('refreshToken', tokens.refreshToken);
   }
@@ -270,6 +273,7 @@ class AuthService {
   }
 
   clearTokens(): void {
+    clearApiCache();
     localStorage.removeItem('accessToken');
     localStorage.removeItem('refreshToken');
   }

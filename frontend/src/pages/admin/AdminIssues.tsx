@@ -75,6 +75,15 @@ export default function AdminIssues() {
   }, [debouncedSearch, filterStatus, currentPage, sortConfig]);
 
   const handleStatusUpdate = async (issueId: string, newStatus: string, resolverNote?: string) => {
+    const previousIssues = [...issues];
+
+    // Optimistic update
+    setIssues(prev => prev.map(issue =>
+      issue._id === issueId
+        ? { ...issue, status: newStatus, ...(resolverNote !== undefined ? { resolverNote } : {}) }
+        : issue
+    ));
+
     try {
       const payload: any = { status: newStatus };
       if (resolverNote !== undefined) payload.resolverNote = resolverNote;
@@ -83,6 +92,8 @@ export default function AdminIssues() {
       toast.success('Complaint status updated successfully');
       fetchIssues();
     } catch (err: any) {
+      // Rollback on error
+      setIssues(previousIssues);
       toast.error(err.message || 'Failed to update status');
     }
   };

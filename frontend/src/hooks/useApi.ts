@@ -15,6 +15,10 @@ interface RequestOptions {
 const apiCache = new Map<string, { data: any, timestamp: number }>();
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
+export const clearApiCache = () => {
+  apiCache.clear();
+};
+
 export const useApi = () => {
   const getToken = () => {
     return localStorage.getItem('accessToken');
@@ -28,7 +32,8 @@ export const useApi = () => {
       options?: RequestOptions & { skipCache?: boolean }
     ) => {
       const isGet = method === 'GET';
-      const cacheKey = endpoint;
+      let token = getToken();
+      const cacheKey = `${token || 'anon'}:${endpoint}`;
       
       // Check cache for GET requests
       if (isGet && !options?.skipCache) {
@@ -38,7 +43,6 @@ export const useApi = () => {
         }
       }
 
-      let token = getToken();
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
         ...options?.headers,
@@ -109,12 +113,11 @@ export const useApi = () => {
 
       const responseData = await response.json();
 
-      // Save to cache if GET
-      if (isGet) {
+      // Save to cache if GET and not skipCache
+      if (isGet && !options?.skipCache) {
         apiCache.set(cacheKey, { data: responseData, timestamp: Date.now() });
-      } else {
-        // Invalidate cache for relevant endpoints if it's a mutation
-        // Simple approach: clear all cache on mutation to ensure fresh data
+      } else if (!isGet) {
+        // Invalidate all cache on mutation to guarantee fresh data
         apiCache.clear();
       }
 
@@ -125,5 +128,5 @@ export const useApi = () => {
 
   const fetchApi = request; // Alias for compatibility with some components
 
-  return { request, fetchApi };
+  return { request, fetchApi, clearCache: clearApiCache };
 };

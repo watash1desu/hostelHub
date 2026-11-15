@@ -12,7 +12,7 @@ export const getDashboardStats = async (req: Request, res: Response) => {
     }
 
     // 1. Fetch Summary Counts
-    const totalStudentsPromise = User.countDocuments({ hostelId, role: 'STUDENT', isActive: true });
+    const totalStudentsPromise = User.countDocuments({ hostelId, role: 'STUDENT', isActive: true, status: { $ne: 'PENDING' } });
     const activeDishesPromise = Dish.countDocuments({ hostelId, status: 'ACTIVE' });
     const openIssuesPromise = Issue.countDocuments({ hostelId, status: 'OPEN' });
     const totalVotesPromise = StudentVote.countDocuments({ hostelId });

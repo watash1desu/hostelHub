@@ -147,13 +147,18 @@ export default function AdminUsers() {
 
   // Toggle User Status (Deactivate / Reactivate)
   const toggleUserStatus = async (user: User) => {
+    const previousUsers = [...users]
+    const action = user.isActive ? 'deactivate' : 'reactivate'
+
+    // Optimistic update
+    setUsers(prev => prev.map(u => u._id === user._id ? { ...u, isActive: !u.isActive } : u))
+
     try {
-      const action = user.isActive ? 'deactivate' : 'reactivate'
       await request(`/admin/users/${user._id}/${action}`, 'PATCH')
-      
       toast.success(`User ${action}d successfully`)
-      setUsers(users.map(u => u._id === user._id ? { ...u, isActive: !u.isActive } : u))
     } catch (err: unknown) {
+      // Rollback on error
+      setUsers(previousUsers)
       toast.error((err as Error).message || 'Failed to update user status')
     }
   }
