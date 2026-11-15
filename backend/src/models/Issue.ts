@@ -15,5 +15,6 @@ const issueSchema = new mongoose.Schema(
 );
 
 issueSchema.index({ hostelId: 1, status: 1 });
+issueSchema.index({ hostelId: 1, status: 1, createdAt: -1 });
 
 export const Issue = mongoose.model('Issue', issueSchema);

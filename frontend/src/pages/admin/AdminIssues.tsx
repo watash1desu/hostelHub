@@ -1,8 +1,10 @@
-import { logger } from '../../lib/logger'
+import { logger } from '../../lib/logger';
 import { useEffect, useState } from 'react';
 import { useApi } from '../../hooks/useApi';
+import { useDebounce } from '../../hooks/useDebounce';
 import { Card } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
+import { Input } from '../../components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/table';
 import { Select } from '../../components/ui/select';
 import { Pagination } from '../../components/ui/pagination';
@@ -28,25 +30,38 @@ interface Issue {
 export default function AdminIssues() {
   const { request } = useApi();
   const [issues, setIssues] = useState<Issue[]>([]);
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
-  const [closePrompt, setClosePrompt] = useState<{ issueId: string, note: string } | null>(null);
+  const [closePrompt, setClosePrompt] = useState<{ issueId: string; note: string } | null>(null);
 
   const [filterStatus, setFilterStatus] = useState<string>('ACTIVE');
+  const [searchQuery, setSearchQuery] = useState('');
+  const debouncedSearch = useDebounce(searchQuery, 300);
 
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 15;
+  const itemsPerPage = 10;
 
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
 
-  useEffect(() => {
-    fetchIssues();
-  }, []);
-
   const fetchIssues = async () => {
+    setLoading(true);
     try {
-      const response = await request('/issues/admin/all', 'GET');
+      const params = new URLSearchParams();
+      if (filterStatus) params.append('status', filterStatus);
+      if (debouncedSearch.trim()) params.append('q', debouncedSearch.trim());
+      params.append('page', String(currentPage));
+      params.append('limit', String(itemsPerPage));
+      if (sortConfig?.key) {
+        params.append('sortBy', sortConfig.key);
+        params.append('order', sortConfig.direction);
+      }
+
+      const response = await request(`/issues/admin/all?${params.toString()}`, 'GET');
       setIssues(response.issues || []);
+      setTotal(response.total ?? 0);
+      setTotalPages(response.pages ?? 1);
     } catch (error: any) {
       logger.error('APP', 'Failed to fetch complaints:', error);
       toast.error('Failed to load complaints');
@@ -54,6 +69,10 @@ export default function AdminIssues() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    fetchIssues();
+  }, [debouncedSearch, filterStatus, currentPage, sortConfig]);
 
   const handleStatusUpdate = async (issueId: string, newStatus: string, resolverNote?: string) => {
     try {
@@ -68,77 +87,49 @@ export default function AdminIssues() {
     }
   };
 
-  const filteredIssues = issues.filter(issue => {
-    const matchStatus = filterStatus === 'ALL' ||
-      (filterStatus === 'ACTIVE' && issue.status === 'OPEN') ||
-      (filterStatus === 'CLOSED' && issue.status === 'CLOSED');
-    return matchStatus;
-  });
-
   const handleSort = (key: string) => {
     let direction: 'asc' | 'desc' = 'asc';
     if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') {
       direction = 'desc';
     }
     setSortConfig({ key, direction });
+    setCurrentPage(1);
   };
-
-  const sortedIssues = [...filteredIssues].sort((a, b) => {
-    if (!sortConfig) return 0;
-    
-    const { key, direction } = sortConfig;
-    
-    let valA: any = a[key as keyof Issue];
-    let valB: any = b[key as keyof Issue];
-
-    if (key === 'status') {
-      const sMap: Record<string, number> = { OPEN: 1, CLOSED: 2 };
-      valA = sMap[a.status] || 0;
-      valB = sMap[b.status] || 0;
-    } else if (key === 'createdAt') {
-      valA = new Date(a.createdAt).getTime();
-      valB = new Date(b.createdAt).getTime();
-    }
-    
-    if (valA === valB) return 0;
-    
-    if (typeof valA === 'string' && typeof valB === 'string') {
-      return direction === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
-    }
-    
-    if (valA < valB) return direction === 'asc' ? -1 : 1;
-    if (valA > valB) return direction === 'asc' ? 1 : -1;
-    return 0;
-  });
 
   const handleDownloadPdf = () => {
     const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
-    const url = `${baseUrl}/issues/admin/export.pdf?status=${encodeURIComponent(filterStatus)}`;
-    const token = localStorage.getItem('accessToken') || localStorage.getItem('token'); 
-    
+    const params = new URLSearchParams();
+    if (filterStatus) params.append('status', filterStatus);
+    if (debouncedSearch.trim()) params.append('q', debouncedSearch.trim());
+    if (sortConfig?.key) params.append('sortBy', sortConfig.key);
+    if (sortConfig?.direction) params.append('order', sortConfig.direction);
+
+    const url = `${baseUrl}/issues/admin/export.pdf?${params.toString()}`;
+    const token = localStorage.getItem('accessToken') || localStorage.getItem('token');
+
     fetch(url, {
       headers: {
-        'Authorization': `Bearer ${token}`
-      }
+        Authorization: `Bearer ${token}`,
+      },
     })
-    .then(res => {
-      if (!res.ok) throw new Error('Failed to download PDF');
-      return res.blob();
-    })
-    .then(blob => {
-      const windowUrl = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = windowUrl;
-      a.download = `Complaints_Export_${new Date().toISOString().split('T')[0]}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      window.URL.revokeObjectURL(windowUrl);
-    })
-    .catch(err => {
-      toast.error('Failed to download PDF');
-      logger.error('APP', 'Error downloading PDF:', err);
-    });
+      .then((res) => {
+        if (!res.ok) throw new Error('Failed to download PDF');
+        return res.blob();
+      })
+      .then((blob) => {
+        const windowUrl = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = windowUrl;
+        a.download = `Complaints_Export_${new Date().toISOString().split('T')[0]}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.URL.revokeObjectURL(windowUrl);
+      })
+      .catch((err) => {
+        toast.error('Failed to download PDF');
+        logger.error('APP', 'Error downloading PDF:', err);
+      });
   };
 
   return (
@@ -148,11 +139,24 @@ export default function AdminIssues() {
           <h2 className="text-card-title text-ink">Complaints</h2>
           <p className="text-body-sm text-muted">Review and resolve mess complaints reported by students</p>
         </div>
-        
-        <div className="flex items-center gap-3 w-full sm:w-auto">
+
+        <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+          <Input
+            type="text"
+            placeholder="Search complaints..."
+            value={searchQuery}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              setCurrentPage(1);
+            }}
+            className="w-full sm:w-[200px]"
+          />
           <Select
             value={filterStatus}
-            onChange={e => { setFilterStatus(e.target.value); setCurrentPage(1); }}
+            onChange={(e) => {
+              setFilterStatus(e.target.value);
+              setCurrentPage(1);
+            }}
             className="w-[140px]"
           >
             <option value="ACTIVE">Active</option>
@@ -169,36 +173,31 @@ export default function AdminIssues() {
         <div className="p-8 text-center text-body text-muted">Loading complaints...</div>
       )}
 
-      {!loading && filteredIssues.length === 0 && (
+      {!loading && issues.length === 0 && (
         <div className="p-8 text-center text-body text-muted">No complaints found matching your filters.</div>
       )}
 
-      {!loading && filteredIssues.length > 0 && (() => {
-        const totalItems = sortedIssues.length;
-        const totalPages = Math.ceil(totalItems / itemsPerPage);
-        const paginatedIssues = sortedIssues.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
-
-        return (
-          <Card className="overflow-hidden shadow-none border-hairline flex flex-col">
-            <Pagination
-              currentPage={currentPage}
-              totalPages={totalPages}
-              onPageChange={setCurrentPage}
-              totalItems={totalItems}
-              itemsPerPage={itemsPerPage}
-            />
-            <div className="overflow-x-auto w-full">
-              <Table>
-                <TableHeader>
+      {!loading && issues.length > 0 && (
+        <Card className="overflow-hidden shadow-none border-hairline flex flex-col">
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={setCurrentPage}
+            totalItems={total}
+            itemsPerPage={itemsPerPage}
+          />
+          <div className="overflow-x-auto w-full">
+            <Table>
+              <TableHeader>
                 <TableRow className="bg-surface-soft">
                   <TableHead className="text-center cursor-pointer hover:bg-surface transition-colors w-[180px]" onClick={() => handleSort('subject')}>
                     <div className="flex items-center justify-center gap-1">
                       Subject <span className="w-3 inline-block text-center">{sortConfig?.key === 'subject' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}</span>
                     </div>
                   </TableHead>
-                  <TableHead className="w-[300px] cursor-pointer hover:bg-surface transition-colors" onClick={() => handleSort('description')}>
+                  <TableHead className="w-[300px]">
                     <div className="flex items-center gap-1">
-                      Complaint <span className="w-3 inline-block text-center">{sortConfig?.key === 'description' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}</span>
+                      Complaint
                     </div>
                   </TableHead>
                   <TableHead className="text-center cursor-pointer hover:bg-surface transition-colors" onClick={() => handleSort('raisedByName')}>
@@ -221,15 +220,15 @@ export default function AdminIssues() {
                       Status <span className="w-3 inline-block text-center">{sortConfig?.key === 'status' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}</span>
                     </div>
                   </TableHead>
-                  <TableHead className="text-center cursor-pointer hover:bg-surface transition-colors" onClick={() => handleSort('resolverNote')}>
+                  <TableHead className="text-center">
                     <div className="flex items-center justify-center gap-1">
-                      Remark <span className="w-3 inline-block text-center">{sortConfig?.key === 'resolverNote' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}</span>
+                      Remark
                     </div>
                   </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {paginatedIssues.map((issue) => (
+                {issues.map((issue) => (
                   <TableRow key={issue._id} className="transition-colors hover:bg-surface-soft">
                     <TableCell className="text-center font-medium text-ink">
                       {issue.subject}
@@ -262,7 +261,7 @@ export default function AdminIssues() {
                           } else {
                             setClosePrompt({
                               issueId: issue._id,
-                              note: ''
+                              note: '',
                             });
                           }
                         }}
@@ -289,8 +288,7 @@ export default function AdminIssues() {
             </Table>
           </div>
         </Card>
-        );
-      })()}
+      )}
 
       <Modal isOpen={!!closePrompt} onClose={() => setClosePrompt(null)} title="Close Complaint">
         <div className="p-6">
@@ -304,12 +302,17 @@ export default function AdminIssues() {
           />
           <div className="flex justify-end gap-3 mt-6">
             <Button variant="secondary" onClick={() => setClosePrompt(null)}>Cancel</Button>
-            <Button variant="primary" onClick={() => {
-              if (closePrompt) {
-                handleStatusUpdate(closePrompt.issueId, 'CLOSED', closePrompt.note);
-                setClosePrompt(null);
-              }
-            }}>Close Complaint</Button>
+            <Button
+              variant="primary"
+              onClick={() => {
+                if (closePrompt) {
+                  handleStatusUpdate(closePrompt.issueId, 'CLOSED', closePrompt.note);
+                  setClosePrompt(null);
+                }
+              }}
+            >
+              Close Complaint
+            </Button>
           </div>
         </div>
       </Modal>

@@ -3,6 +3,7 @@ import { logger } from '../utils/logger';
 import { Request, Response } from 'express';
 import { Issue } from '../models/Issue';
 import { User } from '../models/User';
+import { buildComplaintQuery } from '../utils/buildComplaintQuery';
 
 interface AuthRequest extends Request {
   userId?: string;
@@ -58,11 +59,24 @@ export const getAllIssues = async (req: AuthRequest, res: Response): Promise<voi
       return;
     }
 
-    const issues = await Issue.find({ hostelId: user.hostelId })
-      .sort({ createdAt: -1 });
+    const { filter, sort, skip, limit } = buildComplaintQuery({
+      ...req.query,
+      hostelId: user.hostelId
+    });
+
+    const [issues, total] = await Promise.all([
+      Issue.find(filter).populate('raisedBy', 'name roomNo').sort(sort).skip(skip).limit(limit),
+      Issue.countDocuments(filter)
+    ]);
+
+    const page = Math.floor(skip / limit) + 1;
+    const pages = Math.ceil(total / limit) || 1;
 
     res.status(200).json({
-      issues
+      issues,
+      total,
+      page,
+      pages
     });
 };
 
@@ -162,7 +176,12 @@ export const deleteIssue = async (req: AuthRequest, res: Response): Promise<void
 
 export const exportIssuesPdf = async (req: Request, res: Response) => {
     const hostelId = req.user!.hostelId;
-    const issues = await Issue.find({ hostelId }).populate('raisedBy', 'name roomNo').sort({ createdAt: -1 });
+    const { filter, sort } = buildComplaintQuery({
+      ...req.query,
+      hostelId
+    });
+
+    const issues = await Issue.find(filter).populate('raisedBy', 'name roomNo').sort(sort);
 
     const doc = new PDFDocument();
     res.setHeader('Content-Type', 'application/pdf');
