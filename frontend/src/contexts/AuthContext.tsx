@@ -13,6 +13,7 @@ export interface AuthContextType {
   login: (credentials: { email: string; password: string }) => Promise<UserData>
   logout: () => Promise<void>
   updateUser: (updates: Partial<UserData>) => void
+  clearError: () => void
   isAuthenticated: boolean
 }
 
@@ -92,6 +93,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser((prev: UserData | null) => prev ? { ...prev, ...updates } : null)
   }, [])
 
+  const clearError = useCallback(() => {
+    setError(null)
+  }, [])
+
   const value = {
     user,
     isLoading: isLoading || isInitializing,
@@ -99,6 +104,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     login,
     logout,
     updateUser,
+    clearError,
     isAuthenticated: !!user
   }
 

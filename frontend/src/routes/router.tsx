@@ -50,7 +50,7 @@ const PublicOnlyRoute = ({ children }: { children: React.ReactNode }) => {
   const { isAuthenticated, user, isLoading } = useAuth()
   if (isLoading) return <PageLoader />
   if (isAuthenticated && user) {
-    return <Navigate to={`/${user.role}/dashboard`} replace />
+    return <Navigate to={`/${user.role.toLowerCase()}/dashboard`} replace />
   }
   return <>{children}</>
 }
@@ -71,7 +71,7 @@ const ProtectedRoute = ({ children, allowedRoles }: { children: React.ReactNode,
   }
   
   if (allowedRoles && !allowedRoles.includes(user.role)) {
-    return <Navigate to={`/${user.role}/dashboard`} replace />
+    return <Navigate to={`/${user.role.toLowerCase()}/dashboard`} replace />
   }
   
   return <>{children}</>

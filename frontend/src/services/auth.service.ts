@@ -106,6 +106,15 @@ export interface LoginResponse {
 
 
 class AuthService {
+  // HOSTEL AVAILABILITY CHECK
+  async checkHostelAvailable(name: string): Promise<{ available: boolean }> {
+    const response = await fetch(`${API_URL}/hostel-available?name=${encodeURIComponent(name.trim())}`);
+    if (!response.ok) {
+      return { available: true };
+    }
+    return await response.json();
+  }
+
   // ADMIN REGISTRATION
   async registerAdmin(data: AdminRegisterRequest): Promise<LoginResponse> {
     const response = await fetch(`${API_URL}/admin/register`, {

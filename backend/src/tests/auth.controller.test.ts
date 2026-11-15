@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Request, Response } from 'express';
-import { login } from '../controllers/auth.controller';
+import { login, registerAdmin, checkHostelAvailable } from '../controllers/auth.controller';
 import { User } from '../models/User';
+import { Hostel } from '../models/Hostel';
 import { generateRefreshToken } from '../utils/jwt';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
@@ -9,6 +10,7 @@ import jwt from 'jsonwebtoken';
 process.env.JWT_SECRET = 'test_secret';
 
 vi.mock('../models/User');
+vi.mock('../models/Hostel');
 vi.mock('../utils/jwt', () => ({
   generateRefreshToken: vi.fn(),
   generateAccessToken: vi.fn().mockReturnValue('mocked-token')
@@ -95,5 +97,97 @@ describe('Auth Controller - login', () => {
       accessToken: 'mocked-token',
       user: expect.objectContaining({ username: 'testuser' })
     }));
+  });
+});
+
+describe('Auth Controller - registerAdmin', () => {
+  let req: Partial<Request>;
+  let res: Partial<Response>;
+
+  beforeEach(() => {
+    req = { body: {} };
+    res = {
+      status: vi.fn().mockReturnThis(),
+      json: vi.fn()
+    };
+    vi.clearAllMocks();
+  });
+
+  it('should return 400 if hostel name is invalid (too short)', async () => {
+    req.body = {
+      hostelName: 'ab',
+      adminName: 'Admin',
+      adminEmail: 'admin@test.com',
+      adminPassword: 'password123'
+    };
+
+    await registerAdmin(req as Request, res as Response);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+      field: 'hostelName'
+    }));
+  });
+
+  it('should return 409 if hostel name is already registered', async () => {
+    req.body = {
+      hostelName: 'Grand Palace',
+      adminName: 'Admin',
+      adminEmail: 'admin@test.com',
+      adminPassword: 'password123'
+    };
+
+    vi.mocked(Hostel.findOne).mockResolvedValue({ _id: 'h1', name: 'Grand Palace' } as any);
+
+    await registerAdmin(req as Request, res as Response);
+
+    expect(res.status).toHaveBeenCalledWith(409);
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+      field: 'hostelName',
+      message: expect.stringMatching(/already registered/i)
+    }));
+  });
+});
+
+describe('Auth Controller - checkHostelAvailable', () => {
+  let req: Partial<Request>;
+  let res: Partial<Response>;
+
+  beforeEach(() => {
+    req = { query: {} };
+    res = {
+      status: vi.fn().mockReturnThis(),
+      json: vi.fn()
+    };
+    vi.clearAllMocks();
+  });
+
+  it('should return 400 if name query param is missing', async () => {
+    req.query = {};
+    await checkHostelAvailable(req as Request, res as Response);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith({ message: 'Hostel name is required' });
+  });
+
+  it('should return available: false if hostel exists', async () => {
+    req.query = { name: 'Existing Hostel' };
+    vi.mocked(Hostel.findOne).mockResolvedValue({ _id: 'h1', name: 'Existing Hostel' } as any);
+
+    await checkHostelAvailable(req as Request, res as Response);
+
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json).toHaveBeenCalledWith({ available: false });
+  });
+
+  it('should return available: true if hostel does not exist', async () => {
+    req.query = { name: 'New Hostel' };
+    vi.mocked(Hostel.findOne).mockResolvedValue(null);
+    vi.mocked(User.findOne).mockResolvedValue(null);
+
+    await checkHostelAvailable(req as Request, res as Response);
+
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json).toHaveBeenCalledWith({ available: true });
   });
 });

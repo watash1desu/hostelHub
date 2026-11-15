@@ -23,6 +23,7 @@
     "date-fns": "^4.4.0",
     "dotenv": "^17.2.3",
     "express": "^5.2.1",
+    "express-rate-limit": "^8.5.2",
     "helmet": "^8.1.0",
     "javascript-lp-solver": "^1.0.3",
     "json-logic-js": "^2.0.5",

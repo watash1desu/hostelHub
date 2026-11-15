@@ -1,7 +1,7 @@
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { useNavigate, Link } from 'react-router-dom'
 import { authService } from '../../services/auth.service'
 import { Eye, EyeOff } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
@@ -25,9 +25,30 @@ export default function AdminRegister() {
   const [loading, setLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+  const [isAvailable, setIsAvailable] = useState<boolean | null>(null)
   
   const navigate = useNavigate()
   const { login } = useAuth()
+
+  // Debounced hostel name availability check
+  useEffect(() => {
+    const trimmed = formData.hostelName.trim()
+    if (trimmed.length < 3) {
+      setIsAvailable(null)
+      return
+    }
+
+    const timer = setTimeout(async () => {
+      try {
+        const res = await authService.checkHostelAvailable(trimmed)
+        setIsAvailable(res.available)
+      } catch {
+        // Silently ignore availability check network errors
+      }
+    }, 300)
+
+    return () => clearTimeout(timer)
+  }, [formData.hostelName])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -57,9 +78,13 @@ export default function AdminRegister() {
       // Auto-login the user after registration
       await login({ email: res.user.username, password: formData.adminPassword });
       
-      navigate('/admin');
-    } catch (err) {
-      setError(err instanceof Error ? (err as Error).message : 'Registration failed');
+      navigate('/admin/dashboard', { replace: true });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Registration failed';
+      if (msg.toLowerCase().includes('already registered')) {
+        setIsAvailable(false);
+      }
+      setError(msg);
     } finally {
       setLoading(false);
     }
@@ -82,8 +107,23 @@ export default function AdminRegister() {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label htmlFor="hostelName" className="block text-body-sm mb-2">Hostel Name</label>
-            <Input type="text" id="hostelName" name="hostelName" value={formData.hostelName} onChange={handleChange} placeholder="Enter hostel name" required />
-            {formData.hostelName.trim() && (
+            <Input
+              type="text"
+              id="hostelName"
+              name="hostelName"
+              value={formData.hostelName}
+              onChange={handleChange}
+              placeholder="Enter hostel name"
+              required
+              className={isAvailable === false ? 'border-semantic-error' : ''}
+            />
+            {isAvailable === false && (
+              <p className="text-body-sm text-semantic-error mt-1.5 flex items-center gap-1">
+                Hostel already registered.{' '}
+                <Link to="/login" className="underline font-medium hover:text-ink">Log in</Link>
+              </p>
+            )}
+            {formData.hostelName.trim() && isAvailable !== false && (
               <p className="text-caption text-muted mt-2">
                 Your generated login ID: <span className="font-mono text-ink">admin@{formData.hostelName.toLowerCase().replace(/\s+/g, '').substring(0, 10)}</span>
               </p>
@@ -125,7 +165,7 @@ export default function AdminRegister() {
           </Button>
           
           <p className="text-center text-muted text-body-sm mt-4">
-            Already have an account? <a href="/login" className="text-ink hover:underline">Login here</a>
+            Already have an account? <Link to="/login" className="text-ink hover:underline">Login here</Link>
           </p>
         </form>
       </div>

@@ -16,30 +16,42 @@ export const registerAdmin = async (req: Request, res: Response): Promise<void> 
     return;
   }
 
+  const trimmedHostelName = hostelName.trim();
+  if (trimmedHostelName.length < 3 || trimmedHostelName.length > 40 || !/^[a-zA-Z0-9\s]+$/.test(trimmedHostelName)) {
+    res.status(400).json({
+      message: 'Hostel name must be 3-40 characters and contain only letters, numbers, and spaces',
+      field: 'hostelName'
+    });
+    return;
+  }
+
   if (adminPassword.length < 8) {
     res.status(400).json({ message: 'Password must be at least 8 characters long' });
     return;
   }
 
-  const domain = hostelName
+  const domain = trimmedHostelName
     .toLowerCase()
     .replace(/\s+/g, '')
     .substring(0, 10);
 
   const generatedUsername = `admin@${domain}`;
 
+  const escapedName = trimmedHostelName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const existingHostel = await Hostel.findOne({
-    $or: [{ name: hostelName }, { domain }]
+    $or: [
+      { name: { $regex: new RegExp(`^${escapedName}$`, 'i') } },
+      { domain }
+    ]
   });
 
-  if (existingHostel) {
-    if (existingHostel.name.toLowerCase() === hostelName.toLowerCase()) {
-      res.status(400).json({ message: 'This hostel name is already registered. Please choose a different name.' });
-    } else {
-      res.status(400).json({ 
-        message: `The domain (${domain}) is already in use by another facility. Please choose a distinct domain.` 
-      });
-    }
+  const existingUser = await User.findOne({ username: generatedUsername });
+
+  if (existingHostel || existingUser) {
+    res.status(409).json({
+      message: 'Hostel already registered. Please choose a different name.',
+      field: 'hostelName'
+    });
     return;
   }
 
@@ -161,6 +173,32 @@ export const refresh = async (req: Request, res: Response): Promise<void> => {
       message: 'Token refreshed',
       tokens: { accessToken, refreshToken: newRefreshToken }
     });
+};
+
+// CHECK HOSTEL AVAILABILITY
+export const checkHostelAvailable = async (req: Request, res: Response): Promise<void> => {
+  const { name } = req.query;
+
+  if (!name || typeof name !== 'string' || !name.trim()) {
+    res.status(400).json({ message: 'Hostel name is required' });
+    return;
+  }
+
+  const trimmed = name.trim();
+  const domain = trimmed.toLowerCase().replace(/\s+/g, '').substring(0, 10);
+  const generatedUsername = `admin@${domain}`;
+  const escapedName = trimmed.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+  const existingHostel = await Hostel.findOne({
+    $or: [
+      { name: { $regex: new RegExp(`^${escapedName}$`, 'i') } },
+      { domain }
+    ]
+  });
+
+  const existingUser = await User.findOne({ username: generatedUsername });
+
+  res.status(200).json({ available: !existingHostel && !existingUser });
 };
 
 // LOGOUT

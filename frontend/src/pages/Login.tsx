@@ -10,13 +10,26 @@ import { authService } from '@/services/auth.service'
 
 export default function Login() {
   const navigate = useNavigate()
-  const { login, error: authError } = useAuth()
+  const { login, user, isAuthenticated, clearError } = useAuth()
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [adminLoading, setAdminLoading] = useState(false)
   const [credentialsSaved, setCredentialsSaved] = useState(false)
+
+  // Redirect authenticated users to their dashboard
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      navigate(`/${user.role.toLowerCase()}/dashboard`, { replace: true })
+    }
+  }, [isAuthenticated, user, navigate])
+
+  // Clear stale errors on mount
+  useEffect(() => {
+    setError('')
+    clearError?.()
+  }, [clearError])
 
   // Load saved credentials on mount
   useEffect(() => {
@@ -67,7 +80,7 @@ export default function Login() {
 
 
 
-  const errorDisplay = error || authError;
+  const errorDisplay = error;
 
   return (
     <div className="flex-1 flex flex-col items-center justify-start pt-12 md:justify-center md:pt-0 md:-mt-16">
@@ -138,7 +151,7 @@ export default function Login() {
               </div>
             </div>
 
-            <Button type="submit" className="w-full" disabled={adminLoading}>
+            <Button type="submit" className="w-full" disabled={adminLoading || !username.trim() || !password.trim()}>
               {adminLoading ? 'Signing in...' : 'Sign in'}
             </Button>
           </form>
