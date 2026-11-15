@@ -10,7 +10,8 @@ dist/
 build/
 
 .DS_Store
-docs/
+# docs/
+!docs/MY_CHANGES.md
 .agents/
 backend/seed.ts
 archive/

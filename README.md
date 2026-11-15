@@ -9,109 +9,172 @@
   <img src="https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white" alt="Tailwind CSS" />
 </div>
 
-**HostelHub** is a comprehensive, enterprise-grade multi-tenant hostel management platform. Engineered to digitize and streamline the administrative and operational workflows of modern student housing, it provides a centralized system for mess menu optimization, facility maintenance, and seamless student engagement.
+**HostelHub** is a comprehensive, multi-tenant hostel management platform focused on intelligent mess operations, menu optimization, and complaint resolution.
+
+---
 
 ## Key Features
 
-### 1. Intelligent Menu Optimization
-- **Algorithmic Generation**: Utilizes an advanced Mixed-Integer Linear Programming (MILP) solver to automatically generate weekly menus. It ensures optimal variety, respects dietary gap spacing, and balances nutritional and pricing scores.
-- **Dynamic Voting System**: Empowers students to cast votes on preferred dishes, directly influencing the automated menu generation process.
+### 1. Intelligent Menu Optimization & AI Rules
+- **MILP Solver**: Mixed-Integer Linear Programming solver (`javascript-lp-solver`) schedules weekly meals balancing nutritional variety, pricing, repetition penalties, and student popularity.
+- **Smart Menu Rules**: Natural language constraints parsed with Google Gemini into pure JsonLogic expressions:
+  - `ALLOW_IF`: restricts placement based on condition.
+  - `REQUIRE_IF`: mandates dishes on specific days or meals.
+  - `LIMIT`: caps occurrences with optional sliding window size.
+  - `PREFER`: soft preferences that nudge candidate scores by weights (-50 to 50) without hard infeasibility.
+- **Menu Change Requests**: Students vote on whether they want a new menu. A threshold policy (`minVotersPercent`, `minVoters`, `cooldownDays`) evaluates change requests before drafts can be generated.
 
-### 2. Multi-Tenant Architecture
-- **Strict Data Siloing**: Securely isolates data across different hostels within the same backend infrastructure.
-- **Role-Based Access Control (RBAC)**: Enforces precise access levels for administrators, support staff, and students, guaranteeing data integrity and privacy.
+### 2. Multi-Tenant Architecture & Granular RBAC
+- **Tenant Siloing**: Every query enforces `hostelId` extracted from cryptographically verified JWT tokens.
+- **Student Join Code**: Unique 6-character join code per hostel allows students to self-register into a pending approval queue.
+- **Granular Staff Permissions**:
+  - **Primary Admin**: Complete administrative ownership, staff management, hostel settings, policy editing, and student registration approval.
+  - **Mess Manager (`MANAGE_MENU`)**: Dish catalog curation, dish suggestions approval, menu generation, and publishing.
+  - **Complaints Officer (`MANAGE_ISSUES`)**: Incident management, status resolution with notes, and filtered PDF report exports.
+  - **Student**: View active weekly menus, vote on rotating dish preferences, review served meals, and submit complaints.
 
-### 3. Streamlined Maintenance Operations
-- **Incident Reporting**: Allows students to submit categorized facility issues seamlessly.
-- **Resolution Tracking**: Provides administrators and workers with dedicated tools to assign, monitor, and resolve maintenance tickets efficiently.
-
-### 4. Advanced Security & Authentication
-- **Robust JWT Implementation**: Ensures session security with automated refresh token rotation and comprehensive cryptographic hashing.
-
----
-
-## Installation and Setup
-
-### Prerequisites
-- Node.js (v18.x or higher)
-- Active MongoDB instance (v6.0+ local or MongoDB Atlas)
-
-### Local Development
-
-1. **Clone the repository:**
-   ```bash
-   git clone https://github.com/fo56/hostelHub.git
-   cd hostelHub
-   ```
-
-2. **Install dependencies:**
-   Open two terminals, one for the frontend and one for the backend.
-   ```bash
-   # Terminal 1 (Backend)
-   cd backend && npm install
-   
-   # Terminal 2 (Frontend)
-   cd frontend && npm install
-   ```
-
-3. **Configure Environment Variables:**
-   We have provided `.env.example` files in both the frontend and backend directories. 
-   
-   Copy `.env.example` to `.env` in the `backend` directory:
-   ```bash
-   cp backend/.env.example backend/.env
-   ```
-   **Backend `.env` configuration:**
-   ```env
-   MONGODB_URI=mongodb://localhost:27017/hostelHub
-   JWT_SECRET=your_secure_jwt_secret_key
-   PORT=8000
-   FRONTEND_URL=http://localhost:5173
-   GEMINI_API_KEY=your_gemini_api_key
-   ```
-   *(Note: Ensure you put your valid MongoDB URI and Gemini API key here)*
-
-   Copy `.env.example` to `.env` in the `frontend` directory:
-   ```bash
-   cp frontend/.env.example frontend/.env
-   ```
-   **Frontend `.env` configuration:**
-   ```env
-   VITE_API_URL=http://localhost:8000/api
-   VITE_APP_NAME=HostelHub
-   VITE_APP_ENVIRONMENT=development
-   ```
-
-4. **Seed the Database (Optional but Recommended):**
-   To easily generate initial admin and student accounts, you can seed the database.
-   ```bash
-   # In the backend directory
-   npm run seed
-   ```
-
-5. **Start the application:**
-   In Terminal 1 (Backend):
-   ```bash
-   npm run dev
-   ```
-   In Terminal 2 (Frontend):
-   ```bash
-   npm run dev
-   ```
-
-The application will now be running. The frontend operates on `http://localhost:5173` and the backend operates on `http://localhost:8000`.
+### 3. Server-Side Complaints Management
+- **Optimized Query Engine**: Full text/regex search over subjects, descriptions, room numbers, and student names with server-driven pagination and 300ms debounce.
+- **Audit Trails**: Status updates and notes recorded alongside immutable Activity Logs.
 
 ---
 
-## Technical Stack
-- **Frontend**: React 18, TypeScript, Vite, Tailwind CSS v4, React Router v7, Lucide React (Icons), React Hot Toast (Notifications).
-- **Backend**: Node.js, Express.js, TypeScript, jsonwebtoken.
-- **Database**: MongoDB & Mongoose ODM.
-- **Algorithms**: javascript-lp-solver (MILP constraint engine), json-logic-js.
+## User Roles & Permissions
 
-## System Architecture Principles
-- **Single Responsibility Principle:** Code is highly modularized into logical layers: `controllers`, `services`, `middlewares`, and `models`.
-- **Centralized Error Handling:** Global error catching safely parses Duplicate Key errors and Validation failures centrally.
+| Role | Permissions | Access & Responsibilities |
+| :--- | :--- | :--- |
+| **Primary Admin** | All Permissions (`MANAGE_MENU`, `MANAGE_ISSUES`, Primary Flag) | Manages secondary admin users, sets change policies, approves pending student accounts, manages meal plans, deletes hostel data. |
+| **Mess Manager** | `MANAGE_MENU` | Creates and edits dishes, approves student dish suggestions, configures AI menu rules, generates and publishes weekly menus. |
+| **Complaints Officer** | `MANAGE_ISSUES` | Reviews open issues, filters and searches complaints, resolves tickets with resolver notes, exports filtered PDF reports. |
+| **Student (Active)** | Standard Student Access | Views weekly menu, votes for preferred dishes, submits ratings and reviews for meals, submits complaints, requests menu changes. |
+| **Student (Pending)** | None (Awaiting Approval) | Restricted from logging in until approved by Primary Admin in the "Pending approvals" dashboard. |
 
-## API Documentation
-The platform utilizes a secure REST API architecture. All protected routes require a valid JWT via the `Authorization: Bearer <token>` header. Comprehensive routing logic is maintained within the `backend/src/routes` directory.
+---
+
+## Environment Variables
+
+### Backend (`backend/.env`)
+
+| Variable | Description | Default / Example |
+| :--- | :--- | :--- |
+| `PORT` | HTTP server port | `8000` |
+| `MONGODB_URI` | MongoDB connection connection string | `mongodb://localhost:27017/hostelHub` |
+| `JWT_SECRET` | Secret key for signing Access and Refresh JWT tokens | `your_secure_jwt_secret_key` |
+| `FRONTEND_URL` | Allowed CORS origin for frontend client requests | `http://localhost:5173` |
+| `GEMINI_API_KEY` | Google Gemini API key for natural language menu rules | `your_gemini_api_key` |
+| `NODE_ENV` | Runtime environment (`development`, `production`, `test`) | `development` |
+
+### Frontend (`frontend/.env`)
+
+| Variable | Description | Default / Example |
+| :--- | :--- | :--- |
+| `VITE_API_URL` | Base API URL prefix for backend communication | `http://localhost:8000/api` |
+| `VITE_APP_NAME` | Default application display name | `HostelHub` |
+| `VITE_APP_ENVIRONMENT`| Frontend client environment mode | `development` |
+
+---
+
+## Local Development & Seeding
+
+### 1. Installation
+```bash
+# Backend dependencies
+cd backend
+npm install
+
+# Frontend dependencies
+cd ../frontend
+npm install
+```
+
+### 2. Database Seeding
+An idempotent seed script creates a complete demo hostel named **"Home"** (domain: `home`) populated with all roles and realistic mess data:
+
+```bash
+# Inside the backend/ directory:
+npm run seed
+```
+
+> **Note**: In production environments (`NODE_ENV=production`), the script refuses to run without the `--force` flag:
+> ```bash
+> npm run seed -- --force
+> ```
+
+#### Seeded Demo Accounts (Password: `password123`):
+- **Primary Admin**: `admin@home`
+- **Mess Manager**: `manager@home`
+- **Complaints Officer**: `complaints@home`
+- **Students**: 20 students in rooms 101–120 (`101.1@home` through `120.1@home`)
+- **Hostel Join Code**: Printed in the terminal output upon seed completion.
+
+### 3. Running the Dev Servers
+```bash
+# Terminal 1 (Backend - port 8000)
+cd backend && npm run dev
+
+# Terminal 2 (Frontend - port 5173)
+cd frontend && npm run dev
+```
+
+---
+
+## Production Deployment Steps
+
+### 1. Build Both Packages
+```bash
+# Build backend TypeScript
+cd backend
+npm run build
+
+# Build frontend production bundle
+cd ../frontend
+npm run build
+```
+
+### 2. Run Backend in Production
+```bash
+cd backend
+NODE_ENV=production node dist/server.js
+```
+*(Or manage with PM2: `pm2 start dist/server.js --name hostelhub-backend`)*
+
+### 3. Serve Frontend Assets
+Serve the generated `frontend/dist/` directory using Nginx, Caddy, or Cloudflare Pages with single-page application (SPA) fallback rewrites to `/index.html`.
+
+### 4. Nginx Configuration Snippet
+```nginx
+server {
+    listen 80;
+    server_name your-hostelhub-domain.com;
+
+    # Frontend static files
+    location / {
+        root /var/www/hostelhub/frontend/dist;
+        try_files $uri $uri/ /index.html;
+    }
+
+    # Backend API reverse proxy
+    location /api/ {
+        proxy_pass http://localhost:8000/api/;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
+    }
+}
+```
+
+---
+
+## Testing
+
+Both packages are equipped with Vitest test suites:
+
+```bash
+# Run backend test suite (51 unit tests)
+npm --prefix backend test
+
+# Run frontend test suite (16 unit tests)
+npm --prefix frontend test
+```
