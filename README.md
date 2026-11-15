@@ -12,6 +12,20 @@
 **HostelHub** is a comprehensive, multi-tenant hostel management platform focused on intelligent mess operations, menu optimization, and complaint resolution.
 
 ---
+## What's new in this fork
+
+This is a fork of [fo56/hostelHub](https://github.com/fo56/hostelHub), a team project. The menu optimizer (MILP), authentication and the dish approval workflow come from the original codebase. This fork refocuses the product on mess management and extends it:
+
+- **Complaints replace maintenance issues.** A complaint has a subject, a description and a status. Maintenance categories, priority and the default closure remark are removed. The admin list has server-side search, sorting and pagination.
+- **Roles.** Primary Admin, Mess Manager (menu, dishes, rules) and Complaints Officer. Users and Settings are primary-admin-only, and tabs and routes are hidden or guarded by permission.
+- **Smart Menu Rules** is now its own tab, with a tag library (tag chips, usage counts, warnings for unknown tags) and a soft `PREFER` rule type next to `LIMIT`, `ALLOW_IF` and `REQUIRE_IF`.
+- **Menu change requests** replace auto-generation on vote. A voter threshold plus a cooldown decides when an admin may generate drafts, and a menu is never published automatically.
+- **Student onboarding.** Students join with a hostel join code and wait for admin approval. Bulk import is students-only with a preview and a 200-row cap. New accounts must change the default password at first login, and admins can reset passwords.
+- **Maintainability.** Settings tabs are URL-linkable, status changes update the UI optimistically, the dishes page is split into small components, the app name lives in one config file, and `npm run seed` creates demo data.
+- **Tests.** 57 backend and 16 frontend unit tests.
+- **Security.** Forced password change on first login is enforced on both backend API (via `requirePasswordChanged` middleware) and frontend.
+
+---
 
 ## Key Features
 

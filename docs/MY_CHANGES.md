@@ -20,6 +20,7 @@ This document details every major enhancement made across the **HostelHub** code
 13. [Task 12: Centralized App Branding Configuration](#task-12-centralized-app-branding-configuration)
 14. [Task 13: Production-Ready Demo Seed Script](#task-13-production-ready-demo-seed-script)
 15. [Task 14: Soft PREFER Menu Rules with Weight-Based Score Nudging](#task-14-soft-prefer-menu-rules-with-weight-based-score-nudging)
+16. [Task 15: Enforce Forced Password Change on the Backend](#task-15-enforce-forced-password-change-on-the-backend)
 
 ---
 
@@ -447,3 +448,39 @@ This document details every major enhancement made across the **HostelHub** code
    *A:* The preference weight is only added to the objective variable's score (`score: scaledFinalScore + preferBonus`). Hard `LIMIT` rules generate separate row constraints (`model.constraints[dishLimitKey] = { max: limit }`) which the MILP solver cannot violate under any circumstances.
 3. **Q: Why constrain the preference weight to `[-50, 50]`?**
    *A:* Base candidate scores are scaled to `[0, 200]`. A weight cap of 50 ensures soft rules can nudge close scores (e.g. 150 vs 170) while preventing a single preference rule from completely overriding student vote majorities.
+
+---
+
+## Task 15: Enforce Forced Password Change on the Backend
+
+### What / Why
+- **What**: Backend enforcement of forced password change. Included `mustChangePassword` in the access token claims at login and refresh. Created the `requirePasswordChanged` middleware applied after `verifyToken` to block all protected routes with `403 { code: 'PASSWORD_CHANGE_REQUIRED' }` when `mustChangePassword: true`, exempting only `GET/PUT /api/users/profile`, `POST /api/auth/logout`, and `POST /api/auth/refresh`. Re-issued a fresh access token upon password update, and updated the frontend to redirect to `/set-password` when encountering this code.
+- **Why**: Security defense in depth: client-side route guards alone can be bypassed via direct API calls (e.g. using curl or Postman). Enforcing the policy on the backend guarantees temporary or newly provisioned credentials cannot access any hostel data until the user establishes their private password.
+
+### Files Touched
+- `backend/src/utils/jwt.ts`
+- `backend/src/types/express.d.ts`
+- `backend/src/middlewares/verifyToken.middleware.ts`
+- `backend/src/middlewares/requirePasswordChanged.middleware.ts`
+- `backend/src/controllers/auth.controller.ts`
+- `backend/src/controllers/user.controller.ts`
+- `backend/src/routes/user.routes.ts`
+- `backend/src/server.ts`
+- `backend/src/tests/requirePasswordChanged.test.ts`
+- `frontend/src/hooks/useApi.ts`
+- `frontend/src/pages/SetNewPassword.tsx`
+
+### How to Demo
+1. Log in with a user whose account has `mustChangePassword: true` (e.g. newly created student or reset account).
+2. Attempt to make a direct API call to a normal route (e.g. `GET /api/issues` or `GET /api/student/menu`) using the access token. Observe that the API returns `403 Forbidden` with `{ code: 'PASSWORD_CHANGE_REQUIRED' }`.
+3. In the browser, observe the automatic redirect to `/set-password`.
+4. Enter and confirm a new password (min. 8 characters).
+5. Upon submission, the backend updates the password hash, resets `mustChangePassword` to `false`, and returns a new access token. The user is redirected to their dashboard and all normal routes become accessible.
+
+### 3 Likely Interview Questions & Answers
+1. **Q: Why include `mustChangePassword` in the JWT access token instead of checking the database on every request?**
+   *A:* Querying the database on every single API request adds substantial I/O overhead. Embedding `mustChangePassword` inside the signed, tamper-proof JWT allows fast, stateless authorization checks. When the password is changed, a new JWT is minted and returned.
+2. **Q: Why must `GET/PUT /api/users/profile` and `POST /api/auth/logout`, `POST /api/auth/refresh` be exempted?**
+   *A:* Without these exemptions, the user would enter an unrecoverable deadlock: they could not view or update their profile to change the password, nor could they refresh their session or log out.
+3. **Q: How does the frontend handle token synchronization when a new token is re-issued from a profile update?**
+   *A:* The profile update endpoint returns `{ accessToken, user, ... }`. The frontend client saves the new access token to localStorage and clears the cached API state, ensuring all subsequent requests carry the updated claims without requiring a relogin.
